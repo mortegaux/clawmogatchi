@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clawmogatchi Emulator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="app">
+    <header>
+      <h1>CLAWMOGATCHI <span class="subtitle">Emulator</span></h1>
+    </header>
+
+    <div id="main-layout">
+
+      <!-- LEFT PANEL: the virtual device -->
+      <div id="device-panel">
+
+        <!-- The "screen" of the virtual handheld -->
+        <div id="screen-bezel">
+          <canvas id="game-canvas" width="512" height="256"
+                  title="Game display — 128×64 pixels at 4x zoom"></canvas>
+        </div>
+
+        <!-- Physical buttons (also triggered by keyboard) -->
+        <div id="button-row">
+          <button class="game-btn" id="btn-left"  title="LEFT  (Z or ←)">←</button>
+          <button class="game-btn" id="btn-right" title="RIGHT (X or →)">→</button>
+          <button class="game-btn action-btn" id="btn-action" title="ACTION (A or Enter)">A</button>
+          <button class="game-btn back-btn"   id="btn-back"   title="BACK  (S or Esc)">B</button>
+        </div>
+
+        <!-- Dev controls below the device -->
+        <div id="dev-controls">
+          <label for="speed-slider">
+            Speed:
+            <input type="range" id="speed-slider" min="1" max="100" value="1">
+            <span id="speed-display">1x</span>
+          </label>
+
+          <div id="device-info">
+            <span>Age: <strong id="display-age">0</strong> ticks</span>
+            <span>Gen: <strong id="display-gen">1</strong></span>
+          </div>
+        </div>
+
+        <!-- Keyboard hint -->
+        <div id="key-hints">
+          Keys: <kbd>Z</kbd>=← &nbsp; <kbd>X</kbd>=→ &nbsp; <kbd>A</kbd>=Action &nbsp; <kbd>S</kbd>=Back
+        </div>
+      </div>
+
+      <!-- RIGHT PANEL: stats, personality, event log -->
+      <div id="info-panel">
+
+        <!-- Stat bars -->
+        <section id="stats-section">
+          <h2>Stats</h2>
+
+          <div class="stat-row">
+            <label>Hunger</label>
+            <div class="stat-bar-bg">
+              <div class="stat-bar hunger-bar" id="bar-hunger"></div>
+            </div>
+            <span class="stat-val" id="val-hunger">80</span>
+          </div>
+
+          <div class="stat-row">
+            <label>Happiness</label>
+            <div class="stat-bar-bg">
+              <div class="stat-bar happy-bar" id="bar-happiness"></div>
+            </div>
+            <span class="stat-val" id="val-happiness">70</span>
+          </div>
+
+          <div class="stat-row">
+            <label>Energy</label>
+            <div class="stat-bar-bg">
+              <div class="stat-bar energy-bar" id="bar-energy"></div>
+            </div>
+            <span class="stat-val" id="val-energy">90</span>
+          </div>
+
+          <div class="stat-row">
+            <label>Hygiene</label>
+            <div class="stat-bar-bg">
+              <div class="stat-bar hygiene-bar" id="bar-hygiene"></div>
+            </div>
+            <span class="stat-val" id="val-hygiene">85</span>
+          </div>
+
+          <div class="stat-row">
+            <label>Social</label>
+            <div class="stat-bar-bg">
+              <div class="stat-bar social-bar" id="bar-social"></div>
+            </div>
+            <span class="stat-val" id="val-social">50</span>
+          </div>
+        </section>
+
+        <!-- Personality (placeholder for Phase 4) -->
+        <section id="personality-section">
+          <h2>Personality <span class="phase-tag">(Phase 4)</span></h2>
+          <div class="personality-grid">
+            <span>Sass:</span>        <span id="pers-sass">30</span>
+            <span>Curiosity:</span>   <span id="pers-curiosity">50</span>
+            <span>Affection:</span>   <span id="pers-affection">50</span>
+            <span>Energy:</span>      <span id="pers-energy">50</span>
+            <span>Philosophical:</span><span id="pers-philosophical">30</span>
+          </div>
+        </section>
+
+        <!-- Status badges -->
+        <section id="status-section">
+          <h2>Status</h2>
+          <div id="status-badges">
+            <span class="badge" id="badge-state">IDLE</span>
+            <span class="badge hidden" id="badge-sick">SICK</span>
+            <span class="badge hidden" id="badge-asleep">ASLEEP</span>
+            <span class="badge hidden" id="badge-sugar">SUGAR</span>
+          </div>
+        </section>
+
+        <!-- Event log -->
+        <section id="log-section">
+          <h2>Event Log</h2>
+          <ul id="event-log">
+            <li class="log-entry">Waiting for first tick...</li>
+          </ul>
+        </section>
+
+      </div>
+    </div>
+
+    <!-- Bottom toolbar -->
+    <div id="bottom-bar">
+      <button id="btn-save"       onclick="devSave()">Save</button>
+      <button id="btn-load"       onclick="devLoad()">Load</button>
+      <button id="btn-screenshot" onclick="devScreenshot()">Screenshot</button>
+      <button id="btn-reset"      onclick="devReset()">Reset</button>
+    </div>
+  </div>
+
+  <!-- Load all game modules in dependency order -->
+  <script src="src/hal.js"></script>
+  <script src="src/state.js"></script>
+  <script src="src/food.js"></script>
+  <script src="src/sprites.js"></script>
+  <script src="src/engine.js"></script>
+  <script src="src/state-machine.js"></script>
+  <script src="src/renderer.js"></script>
+  <script src="src/input.js"></script>
+  <script src="src/main.js"></script>
+
+</body>
+</html>

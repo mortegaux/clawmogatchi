@@ -1,0 +1,382 @@
+/* ============================================================
+   CLAWMOGATCHI EMULATOR — Stylesheet
+   Dark retro theme inspired by old-school handheld devices.
+   ============================================================ */
+
+/* ---------- Reset & Base ---------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #0d0f14;
+  color: #c8d0e0;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  min-height: 100vh;
+}
+
+/* ---------- App Shell ---------- */
+#app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+header h1 {
+  font-size: 20px;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #ff8c42;  /* Claude-ish orange */
+}
+
+header .subtitle {
+  font-size: 12px;
+  color: #6c7a93;
+  letter-spacing: 2px;
+}
+
+/* ---------- Main Two-Column Layout ---------- */
+#main-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+/* ---------- Left Panel: Device ---------- */
+#device-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* The bezel that frames the canvas — looks like a device screen */
+#screen-bezel {
+  background: #111418;
+  border: 3px solid #2a2f3a;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow:
+    0 0 0 1px #1e2330,
+    0 4px 24px rgba(0,0,0,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.04);
+}
+
+/* The game canvas — 128×64 at 4× = 512×256 px */
+#game-canvas {
+  display: block;
+  image-rendering: pixelated;   /* keeps pixels sharp when scaled */
+  image-rendering: crisp-edges;
+  width: 512px;
+  height: 256px;
+  border: 1px solid #0a0c10;
+}
+
+/* ---------- Button Row ---------- */
+#button-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.game-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid #2a2f3a;
+  background: #1a1f2b;
+  color: #8899bb;
+  font-size: 16px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.1s, transform 0.05s;
+  user-select: none;
+}
+
+.game-btn:hover {
+  background: #222a3a;
+  color: #c8d0e0;
+}
+
+.game-btn:active,
+.game-btn.pressed {
+  background: #ff8c42;
+  color: #0d0f14;
+  transform: scale(0.92);
+  border-color: #ff8c42;
+}
+
+/* Action button is slightly different colour to stand out */
+.action-btn {
+  background: #1e2d1e;
+  border-color: #2e4a2e;
+  color: #5cb85c;
+}
+
+.action-btn:hover {
+  background: #263526;
+  color: #7dcc7d;
+}
+
+.back-btn {
+  background: #2a1e1e;
+  border-color: #4a2e2e;
+  color: #cc5555;
+}
+
+.back-btn:hover {
+  background: #352626;
+  color: #dd7777;
+}
+
+/* ---------- Dev Controls ---------- */
+#dev-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+}
+
+#dev-controls label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #8899bb;
+}
+
+#speed-slider {
+  width: 140px;
+  accent-color: #ff8c42;
+}
+
+#speed-display {
+  min-width: 36px;
+  color: #ff8c42;
+  font-weight: bold;
+}
+
+#device-info {
+  display: flex;
+  gap: 20px;
+  color: #6c7a93;
+}
+
+#device-info strong {
+  color: #c8d0e0;
+}
+
+/* ---------- Keyboard Hints ---------- */
+#key-hints {
+  color: #4a5568;
+  font-size: 11px;
+  text-align: center;
+}
+
+kbd {
+  background: #1e2330;
+  border: 1px solid #2a3040;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-family: inherit;
+  font-size: 11px;
+}
+
+/* ---------- Right Panel: Info ---------- */
+#info-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+#info-panel section {
+  background: #111418;
+  border: 1px solid #1e2330;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+#info-panel h2 {
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #ff8c42;
+  margin-bottom: 10px;
+}
+
+.phase-tag {
+  font-size: 9px;
+  color: #4a5568;
+  letter-spacing: 1px;
+}
+
+/* ---------- Stat Bars ---------- */
+.stat-row {
+  display: grid;
+  grid-template-columns: 80px 1fr 32px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.stat-row label {
+  color: #8899bb;
+  font-size: 11px;
+}
+
+.stat-bar-bg {
+  background: #1a1f2b;
+  border-radius: 3px;
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid #2a2f3a;
+}
+
+.stat-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  width: 80%; /* will be set by JS */
+}
+
+/* Each stat gets a distinct colour for quick scanning */
+.hunger-bar    { background: #e07b39; }  /* warm orange — food */
+.happy-bar     { background: #e8c234; }  /* golden yellow */
+.energy-bar    { background: #5cb85c; }  /* green */
+.hygiene-bar   { background: #3a9ddd; }  /* sky blue */
+.social-bar    { background: #bb66cc; }  /* purple */
+
+.stat-val {
+  color: #c8d0e0;
+  text-align: right;
+  font-size: 11px;
+}
+
+/* ---------- Personality Grid ---------- */
+.personality-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  color: #8899bb;
+  font-size: 11px;
+}
+
+.personality-grid span:nth-child(even) {
+  color: #c8d0e0;
+}
+
+/* ---------- Status Badges ---------- */
+#status-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  letter-spacing: 1px;
+  font-weight: bold;
+  border: 1px solid;
+}
+
+/* Different badge colours per state */
+#badge-state    { background: #1a2530; border-color: #3a9ddd; color: #3a9ddd; }
+#badge-sick     { background: #2a1a1a; border-color: #cc4444; color: #cc4444; }
+#badge-asleep   { background: #1a1a2a; border-color: #5555cc; color: #7777dd; }
+#badge-sugar    { background: #2a1a2a; border-color: #cc44cc; color: #dd66dd; }
+
+.hidden { display: none; }
+
+/* ---------- Event Log ---------- */
+#event-log {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.log-entry {
+  font-size: 11px;
+  color: #6c7a93;
+  border-left: 2px solid #1e2330;
+  padding-left: 8px;
+  line-height: 1.4;
+}
+
+.log-entry.recent {
+  color: #c8d0e0;
+  border-left-color: #ff8c42;
+}
+
+/* Subtle scrollbar */
+#event-log::-webkit-scrollbar { width: 4px; }
+#event-log::-webkit-scrollbar-track { background: #0d0f14; }
+#event-log::-webkit-scrollbar-thumb { background: #2a2f3a; border-radius: 2px; }
+
+/* ---------- Bottom Bar ---------- */
+#bottom-bar {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  padding: 12px;
+  background: #111418;
+  border: 1px solid #1e2330;
+  border-radius: 6px;
+}
+
+#bottom-bar button {
+  padding: 6px 18px;
+  border-radius: 4px;
+  border: 1px solid #2a2f3a;
+  background: #1a1f2b;
+  color: #8899bb;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  transition: background 0.15s, color 0.15s;
+}
+
+#bottom-bar button:hover {
+  background: #222a3a;
+  color: #c8d0e0;
+  border-color: #ff8c42;
+}
+
+#btn-reset {
+  border-color: #4a2e2e;
+  color: #cc5555;
+}
+
+#btn-reset:hover {
+  background: #2a1e1e;
+  border-color: #cc4444;
+  color: #ff6666;
+}
+
+/* ---------- Responsive: stack on narrow screens ---------- */
+@media (max-width: 700px) {
+  #main-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  #game-canvas {
+    width: 320px;
+    height: 160px;
+  }
+}
