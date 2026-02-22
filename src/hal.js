@@ -40,7 +40,21 @@ const hal = (() => {
   let ctx    = null;
 
   // Zoom factor: we render the 128×64 buffer at 4× = 512×256 pixels
-  const ZOOM = 4;
+  let ZOOM = 4;
+
+  /**
+   * hal.setZoom(n)
+   * Changes the display zoom factor and resizes the canvas via CSS.
+   */
+  function setZoom(n) {
+    ZOOM = n;
+    if (canvas) {
+      canvas.width  = DISPLAY_W * ZOOM;
+      canvas.height = DISPLAY_H * ZOOM;
+      canvas.style.width  = `${DISPLAY_W * ZOOM}px`;
+      canvas.style.height = `${DISPLAY_H * ZOOM}px`;
+    }
+  }
 
   // Pixel colours for the "1-bit" display look
   const COLOR_ON  = '#e8f0e0'; // lit pixel — slightly warm white like an OLED
@@ -495,7 +509,9 @@ const hal = (() => {
     tickInterval,
     setTickSpeed,
 
-    // Expose canvas for screenshot utility
+    // Display control
+    setZoom,
+    getZoom: () => ZOOM,
     getCanvas: () => canvas,
   };
 

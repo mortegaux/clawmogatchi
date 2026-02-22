@@ -246,27 +246,13 @@ const stateMachine = (() => {
       gameState.pet.foodIndex = (gameState.pet.foodIndex + 1) % available.length;
 
     } else if (button === 'ACTION') {
-      // Feed the currently selected food!
-      const food        = available[gameState.pet.foodIndex];
-      const description = applyFoodEffects(gameState, food.id);
-
-      addEventLog(gameState, description);
-
-      // Check if the feeding just triggered a sugar rush
-      if (gameState.pet.sugarState === 'NONE' && gameState.pet.candyCount6Tick >= 3) {
-        // Engine will pick this up on next tick, but we can set state immediately
-        // so the renderer starts the rush animation right away
-        gameState.pet.sugarState      = 'RUSH';
-        gameState.pet.sugarStateTicks = 3;
-        gameState.stats.energy        = Math.min(100, gameState.stats.energy + 20);
-        gameState.stats.happiness     = Math.min(100, gameState.stats.happiness + 10);
-        clampStats(gameState);
-        gameState.pet.state = 'SUGAR_RUSH';
-        addEventLog(gameState, 'SUGAR RUSH triggered!');
-      } else {
-        // Return to idle after feeding
-        gameState.pet.state = 'IDLE';
-      }
+      // Set eating animation flags — renderer applies effects on completion
+      const food = available[gameState.pet.foodIndex];
+      gameState.pet._eatingFood       = food.id;
+      gameState.pet._eatingStartFrame = null;  // renderer latches on first frame
+      gameState.pet._eatingReact      = EATING_REACTIONS[food.id] || EATING_REACTIONS.default;
+      gameState.pet._pendingFoodId    = food.id;
+      // Stay in FEEDING state; renderer will transition to IDLE when done
 
     } else if (button === 'BACK') {
       // Cancel — go back to menu

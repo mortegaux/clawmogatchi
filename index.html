@@ -40,6 +40,26 @@
             <span id="speed-display">1x</span>
           </label>
 
+          <label>Zoom:
+            <select id="zoom-select">
+              <option value="2">2x</option>
+              <option value="4" selected>4x</option>
+              <option value="6">6x</option>
+              <option value="8">8x</option>
+            </select>
+          </label>
+
+          <label>
+            <input type="checkbox" id="grid-overlay"> Grid overlay
+          </label>
+
+          <label>Preview:
+            <select id="anim-preview-select">
+              <option value="">-- none --</option>
+            </select>
+          </label>
+          <canvas id="anim-preview-canvas" width="128" height="64"></canvas>
+
           <div id="device-info">
             <span>Age: <strong id="display-age">0</strong> ticks</span>
             <span>Gen: <strong id="display-gen">1</strong></span>
@@ -144,15 +164,15 @@
   </div>
 
   <!-- Load all game modules in dependency order -->
-  <script src="src/hal.js"></script>
-  <script src="src/state.js"></script>
-  <script src="src/food.js"></script>
-  <script src="src/sprites.js"></script>
-  <script src="src/engine.js"></script>
-  <script src="src/state-machine.js"></script>
-  <script src="src/renderer.js"></script>
-  <script src="src/input.js"></script>
-  <script src="src/main.js"></script>
+  <script src="src/hal.js?v=2"></script>
+  <script src="src/state.js?v=2"></script>
+  <script src="src/food.js?v=2"></script>
+  <script src="src/sprites.js?v=2"></script>
+  <script src="src/engine.js?v=2"></script>
+  <script src="src/state-machine.js?v=2"></script>
+  <script src="src/renderer.js?v=2"></script>
+  <script src="src/input.js?v=2"></script>
+  <script src="src/main.js?v=2"></script>
 
 </body>
 </html>

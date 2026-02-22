@@ -30,6 +30,19 @@ const renderer = (() => {
   // Heart animation state (shown briefly when you pet the character)
   let heartFrame = 0;
 
+  // Screen transition state (visual wipe effect)
+  let activeTransition = null;
+  let lastState = null;
+
+  // Dialogue scroll-in state
+  let _dialogueScrollX = 0;
+  let _lastDialogue = null;
+
+  // Grid overlay and animation preview
+  let _gridOverlay = false;
+  let _previewAnimation = null;
+  let _previewFrame = 0;
+
   // ----------------------------------------------------------
   // LAYOUT CONSTANTS
   // ----------------------------------------------------------
@@ -69,6 +82,15 @@ const renderer = (() => {
   function renderLoop() {
     frameCount++;
 
+    // Detect state changes for screen transitions
+    if (gameState.pet.state !== lastState) {
+      if (['STATS_VIEW','FEEDING','DEAD'].includes(gameState.pet.state) ||
+          ['STATS_VIEW','FEEDING','DEAD'].includes(lastState)) {
+        activeTransition = { progress: 0, totalFrames: 20 };
+      }
+      lastState = gameState.pet.state;
+    }
+
     // Step 1: clear the display to all-off
     hal.clearScreen();
 
@@ -79,6 +101,56 @@ const renderer = (() => {
 
     // Step 3: push framebuffer to the HTML canvas
     hal.flush();
+
+    // Grid overlay — drawn directly on HTML canvas, not in framebuffer
+    if (_gridOverlay) {
+      const htmlCanvas = hal.getCanvas();
+      const htmlCtx = htmlCanvas.getContext('2d');
+      const zoom = hal.getZoom();
+      htmlCtx.strokeStyle = 'rgba(255,140,66,0.15)';
+      htmlCtx.lineWidth = 1;
+      for (let gx = 0; gx <= 128; gx += 8) {
+        htmlCtx.beginPath();
+        htmlCtx.moveTo(gx * zoom, 0);
+        htmlCtx.lineTo(gx * zoom, 64 * zoom);
+        htmlCtx.stroke();
+      }
+      for (let gy = 0; gy <= 64; gy += 8) {
+        htmlCtx.beginPath();
+        htmlCtx.moveTo(0, gy * zoom);
+        htmlCtx.lineTo(128 * zoom, gy * zoom);
+        htmlCtx.stroke();
+      }
+    }
+
+    // Animation preview canvas
+    if (_previewAnimation && ANIMATIONS[_previewAnimation]) {
+      const anim = ANIMATIONS[_previewAnimation];
+      const previewCanvas = document.getElementById('anim-preview-canvas');
+      if (previewCanvas) {
+        const pCtx = previewCanvas.getContext('2d');
+        pCtx.fillStyle = '#0a0c10';
+        pCtx.fillRect(0, 0, 128, 64);
+
+        _previewFrame++;
+        const frameIdx = Math.floor(_previewFrame / anim.frameDuration) % anim.frames.length;
+        const spriteName = anim.frames[frameIdx];
+        const sprite = SPRITES[spriteName];
+        if (sprite) {
+          // Draw sprite centered in preview at 2x scale
+          const sx = Math.floor((128 - sprite[0].length * 2) / 2);
+          const sy = Math.floor((64 - sprite.length * 2) / 2);
+          for (let row = 0; row < sprite.length; row++) {
+            for (let col = 0; col < sprite[row].length; col++) {
+              if (sprite[row][col]) {
+                pCtx.fillStyle = '#e8f0e0';
+                pCtx.fillRect(sx + col * 2, sy + row * 2, 2, 2);
+              }
+            }
+          }
+        }
+      }
+    }
 
     // Update the HTML sidebar (stat bars, badges, event log)
     updateSidebar();
@@ -149,15 +221,35 @@ const renderer = (() => {
     // --- Choose which pet sprite to draw ---
     let petSprite = choosePetSprite(state, stats, pet);
 
-    // --- Bounce effect for SUGAR_RUSH (offset y by ±2 pixels rapidly) ---
+    // --- Movement effects ---
+    let petX = PET_CENTER_X;
     let petY = PET_AREA_Y + PET_CENTER_Y;
     if (state === 'SUGAR_RUSH') {
       petY += Math.sin(frameCount * 0.8) > 0 ? -2 : 2; // fast bounce
     }
+    if (state === 'SUGAR_CRASH') {
+      petX = PET_CENTER_X + Math.round(Math.sin(frameCount * 0.05) * 2); // slow sway
+    }
 
     // --- Draw the pet ---
     if (petSprite) {
-      hal.drawSprite(PET_CENTER_X, petY, petSprite);
+      hal.drawSprite(petX, petY, petSprite);
+    }
+
+    // --- Eating animation (food sprite approaching) ---
+    if (pet._eatingFood) {
+      drawEatingAnimation();
+    }
+
+    // --- Confetti (birthday cake effect) ---
+    if (pet._confetti && pet._confetti.length > 0) {
+      pet._confetti.forEach(p => {
+        const s = SPRITES['confetti' + p.shape];
+        if (s) hal.drawSprite(Math.round(p.x), Math.round(p.y), s);
+        p.y += p.dy;
+      });
+      pet._confetti = pet._confetti.filter(p => p.y < PET_AREA_Y + PET_AREA_H);
+      if (pet._confetti.length === 0) pet._confetti = null;
     }
 
     // --- Draw special state overlays ---
@@ -212,6 +304,16 @@ const renderer = (() => {
         hal.drawSprite(PET_CENTER_X - 8, PET_AREA_Y + 4, SPRITES.exclamation);
       }
     }
+
+    // --- Screen transition wipe ---
+    if (activeTransition) {
+      const wipeX = Math.round((activeTransition.progress / activeTransition.totalFrames) * DISPLAY_W);
+      for (let y = PET_AREA_Y; y < TEXT_BAR_Y; y++) {
+        for (let x = 0; x < wipeX; x++) hal.drawPixel(x, y, false);
+      }
+      activeTransition.progress++;
+      if (activeTransition.progress >= activeTransition.totalFrames) activeTransition = null;
+    }
   }
 
   /**
@@ -220,6 +322,17 @@ const renderer = (() => {
    * Frame cycling creates the illusion of animation.
    */
   function choosePetSprite(state, stats, pet) {
+    // Eating animation takes priority over everything else
+    if (pet._eatingFood) {
+      if (pet._eatingStartFrame === null) {
+        pet._eatingStartFrame = frameCount; // latch on first rendered frame
+      }
+      const eatFrame = Math.floor((frameCount - pet._eatingStartFrame) / 8);
+      if (eatFrame < 4) return SPRITES[ANIMATIONS.eating.frames[eatFrame]];
+      if (eatFrame < 7) return SPRITES[pet._eatingReact];
+      // eatFrame >= 7: animation complete — handled in drawEatingAnimation()
+    }
+
     switch (state) {
       case 'DEAD':
         return SPRITES.petDead;
@@ -237,11 +350,14 @@ const renderer = (() => {
       case 'SUGAR_CRASH':
         return SPRITES.petSugarCrash;
 
+      case 'TALKING':
+        // Talking mouth cycle
+        return SPRITES[ANIMATIONS.talking.frames[Math.floor(frameCount / 8) % 2]];
+
       case 'IDLE':
       case 'MENU':
       case 'FEEDING':
       case 'STATS_VIEW':
-      case 'TALKING':
       default:
         // Show happy/sad sprite based on happiness stat
         if (stats.happiness >= 60) {
@@ -307,6 +423,74 @@ const renderer = (() => {
 
     hal.drawSprite(x1, y1, SPRITES.star);
     hal.drawSprite(x2, y2, SPRITES.star);
+  }
+
+  // ----------------------------------------------------------
+  // EATING ANIMATION
+  // ----------------------------------------------------------
+
+  /**
+   * drawEatingAnimation()
+   * Draws the food sprite approaching the pet, then handles
+   * deferred food effects when the animation completes.
+   */
+  function drawEatingAnimation() {
+    const pet = gameState.pet;
+    if (!pet._eatingFood) return;
+
+    if (pet._eatingStartFrame === null) {
+      pet._eatingStartFrame = frameCount;
+    }
+
+    const eatFrame   = Math.floor((frameCount - pet._eatingStartFrame) / 8);
+    const foodY      = PET_AREA_Y + PET_CENTER_Y + 4; // mouth height
+    const spriteName = FOOD_SPRITES[pet._eatingFood];
+    const sprite     = spriteName ? SPRITES[spriteName] : null;
+
+    if (eatFrame < 2 && sprite) {
+      // Food visible at right edge
+      hal.drawSprite(108, foodY, sprite);
+    } else if (eatFrame < 4 && sprite) {
+      // Food approaching pet mouth (interpolate 108 → 68)
+      const foodX = 108 - (eatFrame - 2) * 20;
+      hal.drawSprite(foodX, foodY, sprite);
+    }
+    // eatFrame 4-6: chewing reaction — no food drawn
+    // eatFrame >= 7: animation complete
+
+    if (eatFrame >= 7) {
+      // Apply the deferred food effects
+      const description = applyFoodEffects(gameState, pet._pendingFoodId);
+      addEventLog(gameState, description);
+
+      // Check for birthday confetti
+      if (pet._pendingFoodId === 'birthday') {
+        pet._confetti = Array.from({length: 6}, (_, i) => ({
+          x: 10 + i * 18 + Math.random() * 10,
+          y: PET_AREA_Y + 4,
+          shape: i % 3,
+          dy: 0.5 + Math.random() * 0.5,
+        }));
+      }
+
+      // Check for sugar rush trigger
+      if (gameState.pet.sugarState === 'NONE' && gameState.pet.candyCount6Tick >= 3) {
+        gameState.pet.sugarState      = 'RUSH';
+        gameState.pet.sugarStateTicks = 3;
+        gameState.stats.energy        = Math.min(100, gameState.stats.energy + 20);
+        gameState.stats.happiness     = Math.min(100, gameState.stats.happiness + 10);
+        clampStats(gameState);
+        gameState.pet.state = 'SUGAR_RUSH';
+        addEventLog(gameState, 'SUGAR RUSH triggered!');
+      } else {
+        gameState.pet.state = 'IDLE';
+      }
+
+      // Clear animation flags
+      pet._eatingFood       = null;
+      pet._pendingFoodId    = null;
+      pet._eatingStartFrame = 0;
+    }
   }
 
   // ----------------------------------------------------------
@@ -473,11 +657,18 @@ const renderer = (() => {
     hal.drawPixel(boxX + 5, boxY + boxH,     true);
     hal.drawPixel(boxX + 6, boxY + boxH + 1, true);
 
+    // Track dialogue changes for scroll-in effect
+    if (text !== _lastDialogue) {
+      _lastDialogue = text;
+      _dialogueScrollX = 64;
+    }
+    if (_dialogueScrollX > 0) _dialogueScrollX = Math.max(0, _dialogueScrollX - 2);
+
     // Render text inside the box — white pixels on dark background
     // Wrap text to fit ~20 chars per line at scale 1 (6px per char)
     const lines = wrapText(text.toUpperCase(), 20);
     lines.slice(0, 3).forEach((line, idx) => {
-      hal.drawText(boxX + 3, boxY + 3 + idx * 7, line, 1);
+      hal.drawText(boxX + 3 + _dialogueScrollX, boxY + 3 + idx * 7, line, 1);
     });
 
     gameState.pet._textBarOverride = 'A/B TO DISMISS';
@@ -694,6 +885,9 @@ const renderer = (() => {
   // ----------------------------------------------------------
   return {
     init,
+    getFrameCount: () => frameCount,
+    setGridOverlay: (v) => { _gridOverlay = v; },
+    setPreviewAnimation: (name) => { _previewAnimation = name; _previewFrame = 0; },
   };
 
 })();

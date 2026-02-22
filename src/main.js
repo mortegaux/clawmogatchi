@@ -139,6 +139,36 @@ function initDevPanel() {
 
     console.log(`[Dev] Speed ${mult}x → tick every ${newInterval}ms`);
   });
+
+  // Zoom control
+  const zoomSelect = document.getElementById('zoom-select');
+  if (zoomSelect) {
+    zoomSelect.addEventListener('change', () => {
+      hal.setZoom(parseInt(zoomSelect.value, 10));
+    });
+  }
+
+  // Grid overlay
+  const gridCheck = document.getElementById('grid-overlay');
+  if (gridCheck) {
+    gridCheck.addEventListener('change', () => {
+      renderer.setGridOverlay(gridCheck.checked);
+    });
+  }
+
+  // Animation preview — populate options from ANIMATIONS keys
+  const previewSelect = document.getElementById('anim-preview-select');
+  if (previewSelect && typeof ANIMATIONS !== 'undefined') {
+    for (const key of Object.keys(ANIMATIONS)) {
+      const opt = document.createElement('option');
+      opt.value = key;
+      opt.textContent = key;
+      previewSelect.appendChild(opt);
+    }
+    previewSelect.addEventListener('change', () => {
+      renderer.setPreviewAnimation(previewSelect.value || null);
+    });
+  }
 }
 
 /**

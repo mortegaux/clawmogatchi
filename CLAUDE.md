@@ -65,7 +65,7 @@ Each phase (especially Phase 2+) contains more changes than can be written in a 
 ## Development Phase Status
 
 - **Phase 1** ✅ Complete — playable core loop, placeholder sprites
-- **Phase 2** — Real pixel art + animation system (see `HANDOFF.md` for detailed step-by-step spec)
+- **Phase 2** ✅ Complete — real pixel art, eating animation, screen transitions, dev tools (zoom/grid/preview)
 - **Phase 3** — Minigames + Web Audio API
 - **Phase 4** — AI personality via Ollama (local) or Claude API (fallback)
 - **Phase 5** — ESP32 C port (JS version is the spec)

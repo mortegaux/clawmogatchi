@@ -163,6 +163,26 @@ header .subtitle {
   font-weight: bold;
 }
 
+#dev-controls select {
+  background: #1a1f2b;
+  border: 1px solid #2a2f3a;
+  color: #c8d0e0;
+  font-family: inherit;
+  font-size: 12px;
+  border-radius: 3px;
+  padding: 2px 4px;
+  accent-color: #ff8c42;
+}
+
+#anim-preview-canvas {
+  display: block;
+  image-rendering: pixelated;
+  border: 1px solid #2a2f3a;
+  width: 128px;
+  height: 64px;
+  margin-top: 4px;
+}
+
 #device-info {
   display: flex;
   gap: 20px;

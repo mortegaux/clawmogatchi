@@ -762,21 +762,22 @@ No background music in v1. The silence between sounds is part of the Tamagotchi 
 - **Goal:** Fully playable Tamagotchi loop in browser with placeholder art. Food system complete with sugar mechanic. No AI, no minigames, no sound.
 - **Delivered:** 2026-02-21. All items complete. Known Phase 1 limitations (by design): audio stubs, network/AI stubs, PLAY gives +10 happiness placeholder, SICK is isSick flag (no separate renderer branch), no sprite animation frame cycling.
 
-### Phase 2: Art & Animation
-- [ ] Design Claw character sprite (16x16 base)
-- [ ] Create all animation states (idle, happy, sad, eating, sleeping, sick, talking, dead, pooping, attention, sugar rush, sugar crash, sour face, stuffed)
-- [ ] Design menu icons (7 × 8x8)
-- [ ] Design all 11 food sprites (8x8 each: pizza, ramen, tacos, mac & cheese, gummy bears, ice cream, chocolate, sour candy, lollipop, birthday cake, mystery food)
-- [ ] Design additional sprites (poop, medicine, hearts, Z's, speech bubble, confetti, stars, sugar effects)
-- [ ] Implement sprite animation system (frame cycling with configurable timing)
-- [ ] Food-specific eating animations (4 frames standard, 5 frames for candy with reaction)
-- [ ] Sugar rush animation (stars orbiting, hyperactive bounce)
-- [ ] Sugar crash animation (droopy, sluggish)
-- [ ] Birthday cake confetti particle effect
-- [ ] Screen transitions (wipe, scroll)
-- [ ] Stats view screen with bar graphs
-- [ ] Add emulator dev tools: zoom levels, grid overlay, animation preview, screenshot
+### Phase 2: Art & Animation ✅
+- [x] Design Claw character sprite (16x16 base)
+- [x] Create all animation states (idle, happy, sad, eating, sleeping, sick, talking, dead, pooping, attention, sugar rush, sugar crash, sour face, stuffed)
+- [x] Design menu icons (7 × 8x8)
+- [x] Design all 11 food sprites (8x8 each: pizza, ramen, tacos, mac & cheese, gummy bears, ice cream, chocolate, sour candy, lollipop, birthday cake, mystery food)
+- [x] Design additional sprites (poop, medicine, hearts, Z's, speech bubble, confetti, stars, sugar effects)
+- [x] Implement sprite animation system (frame cycling with configurable timing)
+- [x] Food-specific eating animations (4 frames standard, 5 frames for candy with reaction)
+- [x] Sugar rush animation (stars orbiting, hyperactive bounce)
+- [x] Sugar crash animation (droopy, sluggish sway)
+- [x] Birthday cake confetti particle effect
+- [x] Screen transitions (wipe effect)
+- [x] Stats view screen with bar graphs
+- [x] Add emulator dev tools: zoom levels, grid overlay, animation preview, screenshot
 - **Goal:** Visually complete Tamagotchi experience. Every food has a unique sprite and eating animation. The pet looks alive and expressive.
+- **Delivered:** 2026-02-22. All items complete. Eating animation defers food effects to renderer (the one intentional exception to "renderer never modifies state"). Dialogue scroll-in effect added. Talking state cycles mouth frames.
 
 ### Phase 3: Minigames & Sound
 - [ ] Implement Memory Match minigame
