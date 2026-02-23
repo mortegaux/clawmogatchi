@@ -45,7 +45,9 @@ On-screen buttons also work for mouse/touch.
 
 **Sickness & Death** — Neglect your pet and it gets sick. Leave it sick too long and it dies. Give medicine to cure, or start a new generation.
 
-**Personality System** — Five personality traits (sass, curiosity, affection, energy, philosophical) evolve slowly based on how you care for your pet. Phase 4 will use these for AI dialogue.
+**Personality System** — Five personality traits (sass, curiosity, affection, energy, philosophical) evolve slowly based on how you care for your pet. Each dominant trait triggers unique idle animations and flavors dialogue.
+
+**AI Dialogue** — Connect to a local Ollama server or Claude API to give your pet real personality-driven conversation. The pet builds context from its current stats, personality, care history, and recent events. Falls back gracefully to ~50 pre-written offline responses when AI is unavailable. Pet also initiates conversation on its own occasionally.
 
 **Save/Load** — Auto-saves every 5 ticks. Offline catch-up calculates missed ticks when you return (capped at 24 hours).
 
@@ -58,6 +60,8 @@ Below the game screen:
 - **Minigame** — Force-start a specific minigame
 - **Grid overlay** — 8px pixel grid for sprite alignment
 - **Animation preview** — Cycle through animation states
+- **AI Settings** — Ollama URL/model, Claude API key, enable/disable, force talk, status indicator
+- **Personality Editor** — 5 trait sliders (0-100) for real-time personality adjustment
 - **Save / Load / Screenshot / Reset** buttons
 
 ## Architecture
@@ -65,7 +69,7 @@ Below the game screen:
 Vanilla JS, no bundler, no modules. All files load as plain `<script>` tags in order:
 
 ```
-hal → state → food → sprites → minigames → engine → state-machine → renderer → input → main
+hal → state → food → sprites → minigames → ai → engine → state-machine → renderer → input → main
 ```
 
 See [CLAUDE.md](CLAUDE.md) for full architecture documentation.
@@ -80,13 +84,14 @@ clawmogatchi/
 ├── clawmogatchi-prd.md   # Product requirements
 ├── MANUAL.md             # User manual
 └── src/
-    ├── hal.js            # Hardware abstraction (display, input, audio, storage)
+    ├── hal.js            # Hardware abstraction (display, input, audio, storage, HTTP)
     ├── state.js          # Game state shape + helpers
     ├── food.js           # 11 food items + effects
     ├── sprites.js        # All 1-bit pixel art (16x16 pet, 8x8 food/icons)
     ├── minigames.js      # 3 minigames (guess, memory, dodge)
+    ├── ai.js             # AI dialogue (Ollama/Claude API, system prompt, fallback)
     ├── engine.js         # Tick loop, stat decay, sickness, death, save/load
-    ├── state-machine.js  # Button routing, action handlers
+    ├── state-machine.js  # Button routing, action handlers, offline dialogue
     ├── renderer.js       # 60fps render loop, all drawing
     ├── input.js          # Keyboard + button event wiring
     └── main.js           # Entry point, dev panel wiring
@@ -97,7 +102,7 @@ clawmogatchi/
 - Phase 1 — Core loop (complete)
 - Phase 2 — Pixel art & animations (complete)
 - Phase 3 — Minigames & Web Audio (complete)
-- Phase 4 — AI personality via Ollama/Claude API
+- Phase 4 — AI personality via Ollama/Claude API (complete)
 - Phase 5 — ESP32 hardware port
 - Phase 6 — Accelerometer, haptics, NeoPixel
 

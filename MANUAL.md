@@ -46,7 +46,7 @@ Press LEFT or RIGHT from the idle screen to open the menu. The seven icons are:
 1. **Feed** — Opens the food carousel. Scroll with LEFT/RIGHT, press ACTION to feed.
 2. **Play** — Starts a random minigame (see Minigames below).
 3. **Clean** — Cleans up poop and boosts hygiene.
-4. **Talk** — Claw says something based on its current mood.
+4. **Talk** — Claw says something based on its current mood. If AI is enabled, Claw generates personality-driven responses via Ollama or Claude API (see AI Dialogue below).
 5. **Sleep** — Puts Claw to bed (or wakes it up, but waking costs happiness).
 6. **Medicine** — Only works when Claw is sick. Cures sickness.
 7. **Stats** — Shows a stat summary on the display.
@@ -119,7 +119,7 @@ If Claw stays sick for 36 ticks without medicine, it dies.
 
 ## Death and Rebirth
 
-When Claw dies, the death screen shows its age and cause of death. Press ACTION to start a new pet — the generation counter goes up, so you can track how many pets you've raised.
+When Claw dies, the death screen shows its age and cause of death. If AI is enabled, Claw gets a personalized eulogy reflecting its life and personality. Otherwise, a pre-written eulogy is displayed. Press ACTION to start a new pet — the generation counter goes up, so you can track how many pets you've raised.
 
 ## Poop
 
@@ -145,6 +145,50 @@ All game events have sound effects — feeding, cleaning, poop, sickness, menus,
 
 Check the **Mute** checkbox in the dev panel to silence everything.
 
+## AI Dialogue
+
+Claw can talk using real AI! Connect to a local Ollama server or the Claude API to give Claw personality-driven conversation.
+
+**Setup (in dev panel → AI Settings):**
+1. Check **Enable AI** to turn it on
+2. For Ollama (local, free): set the URL (default `http://localhost:11434`) and model name
+3. For Claude API: paste your API key
+4. Use **Prefer Ollama** to choose which backend to try first
+
+**How it works:**
+- Press TALK from the menu — a "thinking..." animation plays while Claw generates a response
+- Claw builds context from its personality traits, current stats, care history, and recent events
+- Responses are capped at 140 characters to fit the display
+- If AI is unavailable, Claw falls back to ~50 pre-written offline responses that match its mood and personality
+- Press BACK during "thinking..." to cancel the request
+- Claw also initiates conversation on its own occasionally (about once every 24 ticks)
+
+## Personality
+
+Claw has five personality traits that evolve based on how you care for it:
+
+| Trait | Low (0) | High (100) |
+|-------|---------|------------|
+| Sass | Earnest, sincere | Sarcastic, witty |
+| Curiosity | Content, chill | Asks questions, shares facts |
+| Affection | Independent | Clingy, warm |
+| Energy | Zen, calm | Hyperactive, excitable |
+| Philosophical | Practical | Deep, existential |
+
+**How traits evolve:**
+- Feed regularly → higher affection, lower sass
+- Neglect → higher sass, lower affection
+- Play often → higher energy
+- Talk often → higher curiosity and philosophical
+- Balanced care → traits drift toward center
+
+**Personality affects the game:**
+- Claw's dominant trait (highest value above 40) triggers unique idle animations — a sassy pet does side-eye, a curious pet looks around, an affectionate pet reaches toward you
+- AI dialogue is flavored by personality — a high-sass Claw might guilt-trip you, while a high-affection Claw is warm and clingy
+- Offline responses are also personality-aware
+
+You can manually adjust traits in the dev panel's **Personality Editor** sliders.
+
 ## Tips
 
 - Feed meals regularly to keep hunger up. Don't overfeed — stuffing Claw costs happiness.
@@ -152,4 +196,5 @@ Check the **Mute** checkbox in the dev panel to silence everything.
 - Clean up poop promptly to avoid sickness.
 - Don't feed too much candy in a row unless you want to see the sugar rush (it's fun but costs energy).
 - If a stat gets critical, the text bar at the bottom will warn you.
+- Talk to Claw often to boost the social stat and develop its personality.
 - The speed slider lets you fast-forward time for testing — crank it to 100x to see the full lifecycle quickly.

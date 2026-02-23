@@ -793,20 +793,21 @@ No background music in v1. The silence between sounds is part of the Tamagotchi 
 - **Goal:** Feature-complete Tamagotchi with games and audio. Still no AI.
 - **Delivered:** 2026-02-22. All items complete. New file `src/minigames.js` added (IIFE, loads after sprites.js). Audio uses lazy AudioContext init inside user gesture handlers to satisfy browser autoplay policy. Three minigames: Guessing Game (best of 5 LEFT/RIGHT), Memory Match (sequence repeat, difficulty scales with age), Dodge (side-scroller, ACTION to jump). PLAYING state added to state machine and renderer.
 
-### Phase 4: AI Personality Integration
-- [ ] Implement personality trait system with evolution
-- [ ] Care history tracking (rolling 48-tick window)
-- [ ] Trait evolution calculations per tick
-- [ ] TALK action: build AI prompt from game state
-- [ ] HTTP client for Ollama backend
-- [ ] HTTP client for Claude API (alternative)
-- [ ] Dialogue display system (scrolling text on screen)
-- [ ] Offline fallback response pool (~50 responses)
-- [ ] Pet-initiated dialogue (random trigger)
-- [ ] Personality-influenced animations (e.g., high-sass pet has different idle)
-- [ ] AI-generated death eulogy
-- [ ] Emulator dev tools: personality editor, force AI dialogue
+### Phase 4: AI Personality Integration ✅ COMPLETE
+- [x] Implement personality trait system with evolution
+- [x] Care history tracking (rolling 48-tick window)
+- [x] Trait evolution calculations per tick
+- [x] TALK action: build AI prompt from game state
+- [x] HTTP client for Ollama backend
+- [x] HTTP client for Claude API (alternative)
+- [x] Dialogue display system (scrolling text on screen)
+- [x] Offline fallback response pool (~50 responses)
+- [x] Pet-initiated dialogue (random trigger)
+- [x] Personality-influenced animations (e.g., high-sass pet has different idle)
+- [x] AI-generated death eulogy
+- [x] Emulator dev tools: personality editor, force AI dialogue
 - **Goal:** The pet has personality. AI dialogue works with local Ollama. The pet feels different from a scripted toy.
+- **Delivered:** 2026-02-22. All items complete. New file `src/ai.js` added (IIFE, loads after minigames.js). System prompt built from personality traits, stats, care history, time of day, and recent events. Ollama primary with Claude API fallback. Async "thinking..." animation during AI requests. ~50 offline responses organized by urgency, personality, and situation. Pet initiates dialogue randomly (~1/24 ticks). AI-generated death eulogies with 5 pre-written fallbacks. Rolling 48-tick care history window drives personality evolution. Five personality-specific idle animations (sass=side-eye, curiosity=looking around, affection=reaching, energy=bouncing, philosophical=stargazing). Dev panel has AI settings (URL, model, API key, enable, force talk, status) and personality editor (5 sliders).
 
 ### Phase 5: ESP32 Hardware Port
 - [ ] Set up Arduino/ESP-IDF project
