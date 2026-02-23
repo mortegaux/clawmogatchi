@@ -77,6 +77,57 @@
             <span>Age: <strong id="display-age">0</strong> ticks</span>
             <span>Gen: <strong id="display-gen">1</strong></span>
           </div>
+
+          <!-- AI Settings (Phase 4) -->
+          <details id="ai-settings">
+            <summary>AI Settings</summary>
+            <div class="ai-settings-grid">
+              <label>
+                <input type="checkbox" id="ai-enabled"> Enable AI dialogue
+              </label>
+              <label>
+                AI Status: <strong id="ai-status">Disabled</strong>
+              </label>
+              <label>Ollama URL:
+                <input type="text" id="ai-ollama-url" value="http://localhost:11434" size="28">
+              </label>
+              <label>Ollama Model:
+                <input type="text" id="ai-ollama-model" value="llama3.2" size="16">
+              </label>
+              <label>Claude API Key:
+                <input type="password" id="ai-claude-key" placeholder="sk-ant-..." size="28">
+              </label>
+              <label>
+                <input type="checkbox" id="ai-prefer-ollama" checked> Prefer Ollama (fallback to Claude)
+              </label>
+              <label>Timeout (ms):
+                <input type="number" id="ai-timeout" value="5000" min="1000" max="30000" step="1000" style="width:70px">
+              </label>
+              <button id="ai-force-talk" type="button">Force AI Dialogue</button>
+            </div>
+          </details>
+
+          <!-- Personality Editor (Phase 4) -->
+          <details id="personality-editor">
+            <summary>Personality Editor</summary>
+            <div class="personality-sliders">
+              <label>Sass: <span id="pers-edit-sass-val">30</span>
+                <input type="range" id="pers-edit-sass" min="0" max="100" value="30">
+              </label>
+              <label>Curiosity: <span id="pers-edit-curiosity-val">50</span>
+                <input type="range" id="pers-edit-curiosity" min="0" max="100" value="50">
+              </label>
+              <label>Affection: <span id="pers-edit-affection-val">50</span>
+                <input type="range" id="pers-edit-affection" min="0" max="100" value="50">
+              </label>
+              <label>Energy: <span id="pers-edit-energy-val">50</span>
+                <input type="range" id="pers-edit-energy" min="0" max="100" value="50">
+              </label>
+              <label>Philosophical: <span id="pers-edit-philosophical-val">30</span>
+                <input type="range" id="pers-edit-philosophical" min="0" max="100" value="30">
+              </label>
+            </div>
+          </details>
         </div>
 
         <!-- Keyboard hint -->
@@ -133,9 +184,9 @@
           </div>
         </section>
 
-        <!-- Personality (placeholder for Phase 4) -->
+        <!-- Personality -->
         <section id="personality-section">
-          <h2>Personality <span class="phase-tag">(Phase 4)</span></h2>
+          <h2>Personality</h2>
           <div class="personality-grid">
             <span>Sass:</span>        <span id="pers-sass">30</span>
             <span>Curiosity:</span>   <span id="pers-curiosity">50</span>
@@ -177,16 +228,17 @@
   </div>
 
   <!-- Load all game modules in dependency order -->
-  <script src="src/hal.js?v=3"></script>
-  <script src="src/state.js?v=3"></script>
-  <script src="src/food.js?v=3"></script>
-  <script src="src/sprites.js?v=3"></script>
-  <script src="src/minigames.js?v=3"></script>
-  <script src="src/engine.js?v=3"></script>
-  <script src="src/state-machine.js?v=3"></script>
-  <script src="src/renderer.js?v=3"></script>
-  <script src="src/input.js?v=3"></script>
-  <script src="src/main.js?v=3"></script>
+  <script src="src/hal.js?v=4"></script>
+  <script src="src/state.js?v=4"></script>
+  <script src="src/food.js?v=4"></script>
+  <script src="src/sprites.js?v=4"></script>
+  <script src="src/minigames.js?v=4"></script>
+  <script src="src/ai.js?v=4"></script>
+  <script src="src/engine.js?v=4"></script>
+  <script src="src/state-machine.js?v=4"></script>
+  <script src="src/renderer.js?v=4"></script>
+  <script src="src/input.js?v=4"></script>
+  <script src="src/main.js?v=4"></script>
 
 </body>
 </html>

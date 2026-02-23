@@ -261,8 +261,12 @@ const renderer = (() => {
       drawStatsScreen();
     } else if (state === 'DEAD') {
       drawDeadScreen();
-    } else if (state === 'TALKING' && pet._dialogue) {
-      drawDialogueBox(pet._dialogue);
+    } else if (state === 'TALKING') {
+      if (pet._aiThinking) {
+        drawThinkingAnimation();
+      } else if (pet._dialogue) {
+        drawDialogueBox(pet._dialogue);
+      }
     }
 
     // --- Skip overlays during minigames (they draw their own full screen) ---
@@ -374,6 +378,15 @@ const renderer = (() => {
           return SPRITES.petSad;
         }
 
+        // Personality-flavored idle: every ~200 frames, show personality sprite
+        {
+          const personalityCycle = frameCount % 300;
+          if (personalityCycle >= 240 && personalityCycle < 280) {
+            const persSprite = getPersonalityIdleSprite();
+            if (persSprite) return persSprite;
+          }
+        }
+
         // Idle blink: hold eyes open for ~100 frames, close for 5 frames
         const blinkCycle = frameCount % 110;
         if (blinkCycle >= 100) {
@@ -431,6 +444,36 @@ const renderer = (() => {
 
     hal.drawSprite(x1, y1, SPRITES.star);
     hal.drawSprite(x2, y2, SPRITES.star);
+  }
+
+  // ----------------------------------------------------------
+  // PERSONALITY IDLE ANIMATION
+  // ----------------------------------------------------------
+
+  /**
+   * getPersonalityIdleSprite()
+   * Returns the personality-specific idle sprite for the dominant trait.
+   * Returns null if no personality sprite should be shown.
+   */
+  function getPersonalityIdleSprite() {
+    if (!gameState || !gameState.personality) return null;
+    if (typeof stateMachine === 'undefined' || !stateMachine.getDominantTrait) return null;
+
+    const dominant = stateMachine.getDominantTrait(gameState.personality);
+    const p = gameState.personality;
+
+    // Only show personality animation if the dominant trait is reasonably strong
+    const val = p[dominant];
+    if (val < 40) return null;
+
+    switch (dominant) {
+      case 'sass':          return SPRITES.petSassIdle;
+      case 'curiosity':     return SPRITES.petCuriousIdle;
+      case 'affection':     return SPRITES.petAffectionIdle;
+      case 'energy':        return SPRITES.petEnergyIdle;
+      case 'philosophical': return SPRITES.petPhiloIdle;
+      default:              return null;
+    }
   }
 
   // ----------------------------------------------------------
@@ -647,16 +690,54 @@ const renderer = (() => {
     const cause = gameState.pet.causeOfDeath || 'unknown';
 
     hal.drawText(20, PET_AREA_Y + 2,  'GOODBYE...', 1);
-    hal.drawText(2,  PET_AREA_Y + 14, `AGE: ${age} TICKS`, 1);
+    hal.drawText(2,  PET_AREA_Y + 12, `AGE: ${age} TICKS`, 1);
 
     // Word-wrap the cause — fit in 128px at scale 1 (each char = 6px)
     const causeStr = `CAUSE: ${cause}`.substring(0, 20).toUpperCase();
-    hal.drawText(2, PET_AREA_Y + 24, causeStr, 1);
+    hal.drawText(2, PET_AREA_Y + 20, causeStr, 1);
 
-    hal.drawText(14, PET_AREA_Y + 34, 'PRESS A FOR', 1);
-    hal.drawText(14, PET_AREA_Y + 42, 'NEW PET', 1);
+    // Eulogy (AI-generated or fallback)
+    if (gameState.pet._eulogy) {
+      const eulogyLines = wrapText(gameState.pet._eulogy.toUpperCase(), 20);
+      eulogyLines.slice(0, 2).forEach((line, idx) => {
+        hal.drawText(2, PET_AREA_Y + 29 + idx * 7, line, 1);
+      });
+    }
+
+    hal.drawText(20, PET_AREA_Y + 42, 'A = NEW PET', 1);
 
     gameState.pet._textBarOverride = `GEN ${gameState.pet.generation}`;
+  }
+
+  // ----------------------------------------------------------
+  // THINKING ANIMATION (shown while waiting for AI response)
+  // ----------------------------------------------------------
+
+  /**
+   * drawThinkingAnimation()
+   * Shows a thought bubble with cycling dots above the pet.
+   */
+  function drawThinkingAnimation() {
+    // Thought bubble position
+    const bubbleX = PET_CENTER_X + 18;
+    const bubbleY = PET_AREA_Y + 6;
+
+    // Draw thought bubble
+    hal.drawSprite(bubbleX, bubbleY, SPRITES.thoughtBubble);
+
+    // Cycling dots: 1 dot → 2 dots → 3 dots → blank, repeat
+    const phase = Math.floor(frameCount / 15) % 4; // each phase ~0.25s
+    const dotSprites = [null, SPRITES.thinkDot1, SPRITES.thinkDot2, SPRITES.thinkDot3];
+    const dotSprite = dotSprites[phase];
+
+    if (dotSprite) {
+      const dotX = bubbleX + 7;
+      const dotY = bubbleY + 1;
+      hal.drawSprite(dotX, dotY, dotSprite);
+    }
+
+    // Show "THINKING..." in text bar
+    gameState.pet._textBarOverride = 'THINKING...';
   }
 
   // ----------------------------------------------------------

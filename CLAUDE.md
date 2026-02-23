@@ -19,7 +19,7 @@ There are no tests, no linter config, and no package manager. This is intentiona
 Vanilla JS, no bundler, no modules. All files load as plain `<script>` tags. **Script load order in `index.html` is critical and must be preserved:**
 
 ```
-hal → state → food → sprites → minigames → engine → state-machine → renderer → input → main
+hal → state → food → sprites → minigames → ai → engine → state-machine → renderer → input → main
 ```
 
 Each source file is an IIFE that returns a public API object assigned to a global variable (`hal`, `engine`, `stateMachine`, `renderer`, `input`). `gameState` is a single mutable object passed by reference to all modules — modules mutate it directly, they don't return new state.
@@ -28,16 +28,17 @@ Each source file is an IIFE that returns a public API object assigned to a globa
 
 | Module | Owns |
 |--------|------|
-| `hal.js` | Framebuffer, font, canvas I/O, button events, localStorage, Web Audio (playTone/playMelody/playSfx), network stubs |
+| `hal.js` | Framebuffer, font, canvas I/O, button events, localStorage, Web Audio (playTone/playMelody/playSfx), HTTP fetch |
 | `state.js` | `gameState` shape, `createFreshState()`, `addEventLog()`, `clampStats()`, `clampPersonality()` |
 | `food.js` | Food definitions, `applyFoodEffects()`, `getAvailableFoods()` |
 | `sprites.js` | All 1-bit pixel art arrays, `MENU_ICONS`, `FOOD_SPRITES` lookup, `ANIMATIONS`, `EATING_REACTIONS` |
-| `engine.js` | Tick loop, stat decay, sugar states, poop, sickness, death, personality drift, save/load |
+| `ai.js` | System prompt builder, Ollama/Claude API clients, timeout/fallback |
+| `engine.js` | Tick loop, stat decay, sugar states, poop, sickness, death, personality drift, care history window, pet-initiated dialogue, save/load |
 | `minigames.js` | Minigame framework + 3 games (guess, memory, dodge): startGame, handleInput, update, draw, endGame |
-| `state-machine.js` | Button routing per state, action handlers (feed, play, clean, talk, sleep, medicine), offline dialogue |
-| `renderer.js` | `requestAnimationFrame` loop, all canvas drawing — **never modifies gameState** (exception: eating animation completion in Phase 2) |
+| `state-machine.js` | Button routing per state, action handlers (feed, play, clean, talk, sleep, medicine), async talk with AI, expanded offline dialogue (~50) |
+| `renderer.js` | `requestAnimationFrame` loop, all canvas drawing, thinking animation, personality idle sprites — **never modifies gameState** (exception: eating animation completion in Phase 2) |
 | `input.js` | Keyboard + HTML button events → `hal._pressButton/_releaseButton` |
-| `main.js` | Entry point: init, load/catch-up, wire everything, dev panel |
+| `main.js` | Entry point: init, load/catch-up, wire everything, dev panel, AI settings, personality editor |
 
 ### Display
 
@@ -68,7 +69,7 @@ Each phase (especially Phase 2+) contains more changes than can be written in a 
 - **Phase 1** ✅ Complete — playable core loop, placeholder sprites
 - **Phase 2** ✅ Complete — real pixel art, eating animation, screen transitions, dev tools (zoom/grid/preview)
 - **Phase 3** ✅ Complete — Minigames (Guess/Memory/Dodge) + Web Audio sound effects + mute toggle
-- **Phase 4** — AI personality via Ollama (local) or Claude API (fallback)
+- **Phase 4** ✅ Complete — AI personality via Ollama (local) or Claude API (fallback), expanded offline dialogue, personality animations, dev tools
 - **Phase 5** — ESP32 C port (JS version is the spec)
 - **Phase 6** — Accelerometer, haptics, NeoPixel
 
@@ -91,5 +92,17 @@ Each phase (especially Phase 2+) contains more changes than can be written in a 
 - `hal.drawSprite(x, y, spriteData, inverted)` — `inverted=true` flips bits (used for selected menu icons)
 - All stat values are floats internally, clamped to 0–100 by `clampStats()`
 - Event log is a ring buffer of 20 entries on `gameState.eventLog[]`
-- Audio (`playTone`, `playMelody`) and network (`httpPost`) are no-ops until Phase 3/4
+- `hal.httpPost(url, body, headers, timeoutMs)` is a real `fetch()` wrapper with `AbortController` timeout
 - The HTML sidebar (stat bars, personality, event log) is rendered by `renderer.js` via direct DOM manipulation, not canvas
+
+## Phase 4 Implementation Notes
+
+- **AI Module**: `ai.js` IIFE loaded after `sprites.js`/`minigames.js`, before `engine.js`. Builds system prompts from pet state, sends to Ollama (`/api/generate`) or Claude API (`/v1/messages`) with configurable timeout and automatic fallback.
+- **Async Talk**: `performTalk()` in `state-machine.js` is async. Sets `pet._aiThinking = true` → shows thinking dots animation in renderer → waits for AI response → falls back to offline dialogue on failure. BACK cancels mid-request.
+- **Offline Dialogue**: ~50 pre-written responses organized by: urgent needs (stats < 20), situational (sick/sugar/poop), personality-flavored (dominant trait > 60), general happy.
+- **Care History**: `careHistory._tickWindow` is a ring buffer of last 48 ticks. Per-tick flags (`_fedThisTick`, `_playedThisTick`, etc.) are set by action handlers, consumed by `updateCareHistoryWindow()` each tick, and counters are recomputed from the window.
+- **Pet-Initiated Dialogue**: ~1 in 24 ticks (AI enabled) or ~1 in 48 (offline) random chance during IDLE. Calls `stateMachine.performTalk()`.
+- **Death Eulogy**: On death, `requestEulogy()` async-requests an AI eulogy stored in `pet._eulogy`. Fallback pool of 5 pre-written eulogies. Displayed on death screen.
+- **Personality Animations**: Dominant trait (highest of 5) triggers a unique idle sprite every ~300 frames (petSassIdle, petCuriousIdle, petAffectionIdle, petEnergyIdle, petPhiloIdle). Only shown if dominant trait >= 40.
+- **Dev Tools**: AI Settings panel (Ollama URL/model, Claude API key, enable toggle, force dialogue button, status indicator). Personality Editor (5 sliders, 0–100, live adjustment). Both in collapsible `<details>` sections.
+- **Save Compat**: Old saves without `aiConfig` or `_tickWindow` get them merged in on load (main.js). Mid-TALKING state resets to IDLE on load (engine.js).

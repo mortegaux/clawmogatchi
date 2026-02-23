@@ -41,6 +41,13 @@ function main() {
   if (savedJson) {
     // We found a save — use it
     gameState = savedJson;
+    // Ensure new Phase 4 fields exist on old saves
+    if (!gameState.aiConfig) {
+      gameState.aiConfig = createFreshState().aiConfig;
+    }
+    if (!gameState.careHistory._tickWindow) {
+      gameState.careHistory._tickWindow = [];
+    }
     addEventLog(gameState, 'Save loaded — welcome back!');
   } else {
     // Fresh start — new pet!
@@ -189,6 +196,131 @@ function initDevPanel() {
       renderer.setPreviewAnimation(previewSelect.value || null);
     });
   }
+
+  // --- AI Settings (Phase 4) ---
+  initAISettings();
+
+  // --- Personality Editor (Phase 4) ---
+  initPersonalityEditor();
+}
+
+/**
+ * initAISettings()
+ * Wires up the AI settings panel controls.
+ */
+function initAISettings() {
+  // Ensure aiConfig exists on loaded saves
+  if (!gameState.aiConfig) {
+    gameState.aiConfig = createFreshState().aiConfig;
+  }
+
+  const config = gameState.aiConfig;
+
+  const enabledCheck  = document.getElementById('ai-enabled');
+  const ollamaUrl     = document.getElementById('ai-ollama-url');
+  const ollamaModel   = document.getElementById('ai-ollama-model');
+  const claudeKey     = document.getElementById('ai-claude-key');
+  const preferOllama  = document.getElementById('ai-prefer-ollama');
+  const timeoutInput  = document.getElementById('ai-timeout');
+  const forceTalkBtn  = document.getElementById('ai-force-talk');
+  const statusDisplay = document.getElementById('ai-status');
+
+  // Set initial values from config
+  if (enabledCheck)  enabledCheck.checked  = config.enabled;
+  if (ollamaUrl)     ollamaUrl.value       = config.ollamaUrl;
+  if (ollamaModel)   ollamaModel.value     = config.ollamaModel;
+  if (claudeKey)     claudeKey.value       = config.claudeApiKey;
+  if (preferOllama)  preferOllama.checked  = config.preferOllama;
+  if (timeoutInput)  timeoutInput.value    = config.timeoutMs;
+
+  // Bind change handlers
+  if (enabledCheck) enabledCheck.addEventListener('change', () => {
+    config.enabled = enabledCheck.checked;
+  });
+  if (ollamaUrl) ollamaUrl.addEventListener('change', () => {
+    config.ollamaUrl = ollamaUrl.value.trim();
+  });
+  if (ollamaModel) ollamaModel.addEventListener('change', () => {
+    config.ollamaModel = ollamaModel.value.trim();
+  });
+  if (claudeKey) claudeKey.addEventListener('change', () => {
+    config.claudeApiKey = claudeKey.value.trim();
+  });
+  if (preferOllama) preferOllama.addEventListener('change', () => {
+    config.preferOllama = preferOllama.checked;
+  });
+  if (timeoutInput) timeoutInput.addEventListener('change', () => {
+    config.timeoutMs = parseInt(timeoutInput.value, 10) || 5000;
+  });
+
+  // Force talk button
+  if (forceTalkBtn) forceTalkBtn.addEventListener('click', () => {
+    if (typeof stateMachine !== 'undefined' && stateMachine.performTalk) {
+      // Force IDLE so performTalk can take over
+      if (gameState.pet.state !== 'DEAD') {
+        gameState.pet.state = 'IDLE';
+        stateMachine.performTalk();
+      }
+    }
+  });
+
+  // Update AI status display periodically
+  setInterval(() => {
+    if (!statusDisplay) return;
+    if (!config.enabled) {
+      statusDisplay.textContent = 'Disabled';
+      return;
+    }
+    if (typeof ai !== 'undefined') {
+      const status = ai.getStatus();
+      const lastTime = ai.getLastResponseTime();
+      if (status === 'success' && lastTime > 0) {
+        const ago = Math.round((Date.now() - lastTime) / 1000);
+        statusDisplay.textContent = `OK (${ago}s ago)`;
+      } else {
+        statusDisplay.textContent = status === 'requesting' ? 'Requesting...' :
+                                    status === 'error' ? 'Error' : 'Ready';
+      }
+    }
+  }, 1000);
+}
+
+/**
+ * initPersonalityEditor()
+ * Wires up the personality sliders in the dev panel.
+ */
+function initPersonalityEditor() {
+  const traits = ['sass', 'curiosity', 'affection', 'energy', 'philosophical'];
+
+  for (const trait of traits) {
+    const slider = document.getElementById(`pers-edit-${trait}`);
+    const valEl  = document.getElementById(`pers-edit-${trait}-val`);
+    if (!slider || !valEl) continue;
+
+    // Set initial value from gameState
+    slider.value = gameState.personality[trait];
+    valEl.textContent = gameState.personality[trait];
+
+    slider.addEventListener('input', () => {
+      const val = parseInt(slider.value, 10);
+      gameState.personality[trait] = val;
+      valEl.textContent = val;
+    });
+  }
+
+  // Keep sliders in sync with game state (e.g. after natural personality drift)
+  setInterval(() => {
+    for (const trait of traits) {
+      const slider = document.getElementById(`pers-edit-${trait}`);
+      const valEl  = document.getElementById(`pers-edit-${trait}-val`);
+      if (!slider || !valEl) continue;
+      // Only update if slider isn't being actively dragged
+      if (document.activeElement !== slider) {
+        slider.value = gameState.personality[trait];
+        valEl.textContent = gameState.personality[trait];
+      }
+    }
+  }, 2000);
 }
 
 /**

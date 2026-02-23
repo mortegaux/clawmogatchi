@@ -145,23 +145,29 @@ const engine = (() => {
     // --- 7. Check death conditions ---
     checkDeath();
 
-    // --- 8. Update personality traits (slow drift) ---
+    // --- 8. Update care history rolling window ---
+    updateCareHistoryWindow();
+
+    // --- 9. Update personality traits (slow drift) ---
     updatePersonality();
 
-    // --- 9. Reset the 6-tick candy window if it has expired ---
+    // --- 10. Reset the 6-tick candy window if it has expired ---
     if (tick - gameState.pet.candyWindowStartTick >= 6) {
       gameState.pet.candyCount6Tick = 0;
     }
 
-    // --- 10. Auto-save every 5 ticks ---
+    // --- 11. Auto-save every 5 ticks ---
     if (tick % 5 === 0) {
       saveGame();
     }
 
-    // --- 11. Log the tick ---
+    // --- 12. Log the tick ---
     addEventLog(gameState, `Tick #${tick} | H:${gameState.stats.hunger} Hp:${gameState.stats.happiness} E:${gameState.stats.energy}`);
 
-    // --- 12. Notify the UI ---
+    // --- 13. Pet-initiated dialogue (~1 per 24 ticks random chance) ---
+    maybePetInitiatedDialogue();
+
+    // --- 14. Notify the UI ---
     if (onTickCallback) onTickCallback(gameState);
   }
 
@@ -256,10 +262,7 @@ const engine = (() => {
     // --- Clamp all stats to 0–100 ---
     clampStats(gameState);
 
-    // --- Track neglect for sickness and personality ---
-    const anyStatLow = (s.hunger < 20 || s.happiness < 20 ||
-                        s.energy < 20  || s.hygiene < 20 || s.social < 20);
-    if (anyStatLow) gameState.careHistory.neglectTicks++;
+    // Neglect tracking is handled by updateCareHistoryWindow() via the rolling window
 
     // --- Track consecutive-zero ticks for sickness triggers ---
     // These are counted every tick regardless of sleep
@@ -475,6 +478,10 @@ const engine = (() => {
       pet.causeOfDeath = buildCauseOfDeath();
       hal.playSfx('deathTone');
       addEventLog(gameState, `Pet died after ${pet.age} ticks — ${pet.causeOfDeath}`);
+
+      // Request AI eulogy (async, non-blocking)
+      requestEulogy();
+
       saveGame(); // save the death state so it persists on refresh
     }
   }
@@ -491,6 +498,96 @@ const engine = (() => {
     if (pet.happinessZeroTicks >= 24) return 'a broken heart';
     if (pet.hygieneLoTicks >= 6)      return 'unhygienic conditions';
     return 'neglect (too many needs unmet)';
+  }
+
+  // Pre-written eulogy fallbacks
+  const FALLBACK_EULOGIES = [
+    "A tiny claw that left big memories.",
+    "Gone but never forgotten. Snip snip forever.",
+    "The bravest little lobster in the whole screen.",
+    "They lived, they loved, they pinched. Rest well.",
+    "A pixel life, but a real friend.",
+  ];
+
+  /**
+   * requestEulogy()
+   * Async — requests an AI eulogy on death, stores it on pet._eulogy.
+   * Falls back to a pre-written eulogy on failure.
+   */
+  async function requestEulogy() {
+    const pet = gameState.pet;
+
+    // Set fallback immediately
+    pet._eulogy = FALLBACK_EULOGIES[Math.floor(Math.random() * FALLBACK_EULOGIES.length)];
+
+    // Try AI if available
+    if (typeof ai !== 'undefined' && gameState.aiConfig && gameState.aiConfig.enabled) {
+      try {
+        const aiEulogy = await ai.requestDeathEulogy(gameState);
+        if (aiEulogy) {
+          pet._eulogy = aiEulogy;
+        }
+      } catch (e) {
+        // Keep the fallback
+      }
+    }
+  }
+
+  // ----------------------------------------------------------
+  // CARE HISTORY ROLLING WINDOW (48 ticks)
+  // ----------------------------------------------------------
+
+  /**
+   * updateCareHistoryWindow()
+   * Maintains a rolling 48-tick window of care actions.
+   * Each tick, we push a snapshot of what happened this tick,
+   * trim entries older than 48 ticks, and recompute the counters.
+   *
+   * Action flags (_fed, _played, _talked, _cleaned) are set by
+   * state-machine.js action handlers and consumed here each tick.
+   */
+  function updateCareHistoryWindow() {
+    const care = gameState.careHistory;
+    const s = gameState.stats;
+
+    // Ensure _tickWindow exists (handles old saves)
+    if (!care._tickWindow) care._tickWindow = [];
+
+    // Snapshot this tick's actions (flags set by state-machine.js)
+    const anyStatLow = (s.hunger < 20 || s.happiness < 20 ||
+                        s.energy < 20  || s.hygiene < 20 || s.social < 20);
+    care._tickWindow.push({
+      feed:    !!gameState.pet._fedThisTick,
+      play:    !!gameState.pet._playedThisTick,
+      talk:    !!gameState.pet._talkedThisTick,
+      clean:   !!gameState.pet._cleanedThisTick,
+      neglect: anyStatLow,
+    });
+
+    // Clear the per-tick flags
+    gameState.pet._fedThisTick     = false;
+    gameState.pet._playedThisTick  = false;
+    gameState.pet._talkedThisTick  = false;
+    gameState.pet._cleanedThisTick = false;
+
+    // Trim to 48 entries
+    while (care._tickWindow.length > 48) {
+      care._tickWindow.shift();
+    }
+
+    // Recompute counters from the window
+    care.feedCount    = 0;
+    care.playCount    = 0;
+    care.talkCount    = 0;
+    care.cleanCount   = 0;
+    care.neglectTicks = 0;
+    for (const entry of care._tickWindow) {
+      if (entry.feed)    care.feedCount++;
+      if (entry.play)    care.playCount++;
+      if (entry.talk)    care.talkCount++;
+      if (entry.clean)   care.cleanCount++;
+      if (entry.neglect) care.neglectTicks++;
+    }
   }
 
   // ----------------------------------------------------------
@@ -521,25 +618,26 @@ const engine = (() => {
 
     const p    = gameState.personality;
     const care = gameState.careHistory;
+    const window = Math.max(1, (care._tickWindow || []).length); // 48-tick window size
 
     // --- Sass: goes up with neglect, down with frequent feeding ---
-    const neglectRate = care.neglectTicks / Math.max(1, tick); // ratio 0-1
+    const neglectRate = care.neglectTicks / window;
     nudgeTrait(p, 'sass', neglectRate > 0.3 ? +0.5 : -0.3);
 
     // --- Affection: goes up with frequent interaction ---
-    const interactionRate = (care.feedCount + care.talkCount) / Math.max(1, tick);
-    nudgeTrait(p, 'affection', interactionRate > 0.5 ? +0.5 : -0.2);
+    const interactionRate = (care.feedCount + care.talkCount) / window;
+    nudgeTrait(p, 'affection', interactionRate > 0.15 ? +0.5 : -0.2);
 
     // --- Energy: goes up with play ---
-    const playRate = care.playCount / Math.max(1, tick);
-    nudgeTrait(p, 'energy', playRate > 0.2 ? +0.5 : -0.2);
+    const playRate = care.playCount / window;
+    nudgeTrait(p, 'energy', playRate > 0.06 ? +0.5 : -0.2);
 
     // --- Curiosity: goes up with talking ---
-    const talkRate = care.talkCount / Math.max(1, tick);
-    nudgeTrait(p, 'curiosity', talkRate > 0.1 ? +0.5 : -0.1);
+    const talkRate = care.talkCount / window;
+    nudgeTrait(p, 'curiosity', talkRate > 0.04 ? +0.5 : -0.1);
 
     // --- Philosophical: goes up with talking, very slowly ---
-    nudgeTrait(p, 'philosophical', talkRate > 0.15 ? +0.3 : -0.1);
+    nudgeTrait(p, 'philosophical', talkRate > 0.06 ? +0.3 : -0.1);
 
     clampPersonality(gameState);
   }
@@ -558,6 +656,34 @@ const engine = (() => {
     if (delta < 0 && val < 20) delta *= 0.1;
 
     personality[key] += delta;
+  }
+
+  // ----------------------------------------------------------
+  // PET-INITIATED DIALOGUE
+  // ----------------------------------------------------------
+
+  /**
+   * maybePetInitiatedDialogue()
+   * Random chance each tick for the pet to speak on its own.
+   * ~1 in 24 ticks when AI is enabled, ~1 in 48 when offline.
+   * Only triggers in IDLE state, awake, not sick.
+   */
+  function maybePetInitiatedDialogue() {
+    const pet = gameState.pet;
+    if (pet.state !== 'IDLE') return;
+    if (pet.isAsleep) return;
+    if (pet.isSick) return;
+
+    const aiEnabled = gameState.aiConfig && gameState.aiConfig.enabled;
+    const chance = aiEnabled ? (1 / 24) : (1 / 48);
+
+    if (Math.random() < chance) {
+      // Trigger talk — stateMachine.performTalk is async
+      if (typeof stateMachine !== 'undefined' && stateMachine.performTalk) {
+        stateMachine.performTalk();
+        addEventLog(gameState, 'Pet wants to chat!');
+      }
+    }
   }
 
   // ----------------------------------------------------------
@@ -585,11 +711,18 @@ const engine = (() => {
     if (!json) return null;
     try {
       const loaded = JSON.parse(json);
-      // If saved mid-minigame, reset to IDLE (minigame state is transient)
-      if (loaded && loaded.pet && loaded.pet.state === 'PLAYING') {
-        loaded.pet.state = 'IDLE';
-        loaded.pet._currentMinigame = null;
-        loaded.pet._minigameData = null;
+      // If saved mid-minigame or mid-talk, reset to IDLE (transient states)
+      if (loaded && loaded.pet) {
+        if (loaded.pet.state === 'PLAYING') {
+          loaded.pet.state = 'IDLE';
+          loaded.pet._currentMinigame = null;
+          loaded.pet._minigameData = null;
+        }
+        if (loaded.pet.state === 'TALKING') {
+          loaded.pet.state = 'IDLE';
+          loaded.pet._dialogue = null;
+          loaded.pet._aiThinking = false;
+        }
       }
       return loaded;
     } catch (e) {

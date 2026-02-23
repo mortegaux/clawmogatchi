@@ -184,6 +184,7 @@ const stateMachine = (() => {
         {
           const types = minigames.GAME_TYPES;
           const pick = types[Math.floor(Math.random() * types.length)];
+          gameState.pet._playedThisTick = true; // rolling window tracking
           minigames.startGame(pick, gameState);
         }
         break;
@@ -258,6 +259,7 @@ const stateMachine = (() => {
       gameState.pet._eatingStartFrame = null;  // renderer latches on first frame
       gameState.pet._eatingReact      = EATING_REACTIONS[food.id] || EATING_REACTIONS.default;
       gameState.pet._pendingFoodId    = food.id;
+      gameState.pet._fedThisTick      = true; // rolling window tracking
       hal.playSfx('feedChirp');
       // Stay in FEEDING state; renderer will transition to IDLE when done
 
@@ -276,7 +278,7 @@ const stateMachine = (() => {
     // Cleaning restores hygiene and removes all poop
     gameState.stats.hygiene = Math.min(100, gameState.stats.hygiene + 30);
     gameState.pet.poopCount = 0;
-    gameState.careHistory.cleanCount++;
+    gameState.pet._cleanedThisTick = true; // rolling window tracking
     clampStats(gameState);
 
     addEventLog(gameState, `Cleaned! Hygiene +30`);
@@ -294,76 +296,189 @@ const stateMachine = (() => {
   // ACTION: TALK (Phase 4 stub)
   // ----------------------------------------------------------
 
-  function performTalk() {
-    gameState.pet.state   = 'TALKING';
-    gameState.pet.lastTalked = gameState.time.currentTick;
-    gameState.careHistory.talkCount++;
-    gameState.stats.social = Math.min(100, gameState.stats.social + 10);
+  /**
+   * performTalk()
+   * Async talk action. If AI is enabled, shows "thinking..." animation
+   * while waiting for the AI response, then falls back to offline dialogue
+   * on failure. If AI is disabled, uses offline dialogue immediately.
+   */
+  async function performTalk() {
+    gameState.pet.state          = 'TALKING';
+    gameState.pet.lastTalked     = gameState.time.currentTick;
+    gameState.pet._talkedThisTick = true; // rolling window tracking
+    gameState.stats.social       = Math.min(100, gameState.stats.social + 10);
     clampStats(gameState);
-
-    // Phase 4 will fire an HTTP request to Ollama/Claude here.
-    // For now, use a simple offline response.
-    const response = getOfflineDialogue(gameState);
-    gameState.pet._dialogue      = response;
-    gameState.pet._dialogueTick  = gameState.time.currentTick;
     hal.playSfx('talkStart');
 
-    addEventLog(gameState, `Talked: "${response.substring(0, 30)}..."`);
+    const aiEnabled = gameState.aiConfig && gameState.aiConfig.enabled &&
+                      typeof ai !== 'undefined';
+
+    if (!aiEnabled) {
+      // Instant offline response
+      const response = getOfflineDialogue(gameState);
+      gameState.pet._dialogue     = response;
+      gameState.pet._dialogueTick = gameState.time.currentTick;
+      gameState.pet._aiThinking   = false;
+      addEventLog(gameState, `Talked: "${response.substring(0, 30)}..."`);
+      return;
+    }
+
+    // AI enabled — show thinking state
+    gameState.pet._dialogue   = null;
+    gameState.pet._aiThinking = true;
+
+    try {
+      const response = await ai.requestAIDialogue(gameState);
+
+      // Check if user cancelled during the request (pressed BACK)
+      if (gameState.pet.state !== 'TALKING') return;
+
+      if (response) {
+        gameState.pet._dialogue     = response;
+        gameState.pet._aiThinking   = false;
+        gameState.pet._dialogueTick = gameState.time.currentTick;
+        addEventLog(gameState, `AI: "${response.substring(0, 30)}..."`);
+      } else {
+        // AI returned null — use offline fallback
+        const fallback = getOfflineDialogue(gameState);
+        gameState.pet._dialogue     = fallback;
+        gameState.pet._aiThinking   = false;
+        gameState.pet._dialogueTick = gameState.time.currentTick;
+        addEventLog(gameState, `Talked: "${fallback.substring(0, 30)}..."`);
+      }
+    } catch (e) {
+      // All AI backends failed — offline fallback
+      if (gameState.pet.state !== 'TALKING') return;
+      const fallback = getOfflineDialogue(gameState);
+      gameState.pet._dialogue     = fallback;
+      gameState.pet._aiThinking   = false;
+      gameState.pet._dialogueTick = gameState.time.currentTick;
+      addEventLog(gameState, `Talked: "${fallback.substring(0, 30)}..."`);
+    }
   }
 
   /**
    * getOfflineDialogue(state)
-   * Returns a pre-written response based on the pet's current mood.
-   * Phase 4 will replace this with a real AI call.
+   * Returns a pre-written response based on the pet's current mood,
+   * personality traits, and situation. ~50 total responses organized
+   * by urgency → situation → personality flavor → general happy.
    *
    * @param {object} state - The full game state
    */
   function getOfflineDialogue(state) {
     const s   = state.stats;
     const pet = state.pet;
+    const p   = state.personality;
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-    // Priority: respond to the most urgent need first
-    if (s.hunger < 20) {
-      return "My tummy is growling... can we get some food?";
-    }
-    if (s.hygiene < 20) {
-      return "I feel kinda gross. Can you clean up?";
-    }
-    if (s.happiness < 20) {
-      return "I'm feeling really down... let's play?";
-    }
-    if (s.social < 20) {
-      return "I missed you! It's been lonely here.";
-    }
-    if (s.energy < 20) {
-      return "So... sleepy... can't keep... eyes open...";
-    }
-    if (pet.isSick) {
-      return "I don't feel so good. Medicine please?";
-    }
-    if (pet.sugarState === 'RUSH') {
-      return "EVERYTHING IS SO AMAZING RIGHT NOW!!!";
-    }
-    if (pet.sugarState === 'CRASH') {
-      return "ugh... why did I eat all that candy...";
-    }
-    if (pet.poopCount >= 2) {
-      return "It's getting a bit... fragrant in here.";
-    }
+    // --- Priority 1: Urgent stat needs (any stat < 20) ---
+    if (s.hunger < 20) return pick([
+      "My tummy is growling... can we get some food?",
+      "I'm so hungry I could eat a whole pizza!",
+      "Feed me? Pretty please? I'll be good!",
+    ]);
+    if (s.happiness < 20) return pick([
+      "I'm feeling really down... let's play?",
+      "Everything feels grey today. Cheer me up?",
+      "I could use something fun right about now...",
+    ]);
+    if (s.energy < 20) return pick([
+      "So... sleepy... can't keep... eyes open...",
+      "I think I need a nap. Or five.",
+      "Running on empty here... zzz...",
+    ]);
+    if (s.hygiene < 20) return pick([
+      "I feel kinda gross. Can you clean up?",
+      "Is that smell coming from me? Oh no...",
+      "A bath sounds really nice right now.",
+    ]);
+    if (s.social < 20) return pick([
+      "I missed you! It's been lonely here.",
+      "Hey! Don't forget about me in here!",
+      "I just want someone to talk to...",
+    ]);
 
-    // Happy responses when everything is fine
-    const happyLines = [
+    // --- Priority 2: Situational ---
+    if (pet.isSick) return pick([
+      "I don't feel so good. Medicine please?",
+      "My head is spinning... help...",
+      "Is there a doctor in the house?",
+    ]);
+    if (pet.sugarState === 'RUSH') return pick([
+      "EVERYTHING IS SO AMAZING RIGHT NOW!!!",
+      "I CAN SEE THROUGH TIME!!! WHEEEEE!!!",
+      "CANDY IS THE BEST THING EVER INVENTED!",
+    ]);
+    if (pet.sugarState === 'CRASH') return pick([
+      "ugh... why did I eat all that candy...",
+      "I regret everything. My tummy hurts.",
+      "No more sugar... ever... I mean it this time.",
+    ]);
+    if (pet.poopCount >= 2) return pick([
+      "It's getting a bit... fragrant in here.",
+      "Ahem. Could someone tidy up around here?",
+      "I'd clean it myself but... no thumbs.",
+    ]);
+
+    // --- Priority 3: Personality-flavored happy responses ---
+    // Find the dominant personality trait
+    const dominant = getDominantTrait(p);
+
+    if (dominant === 'sass' && p.sass > 60) return pick([
+      "Oh, you finally decided to talk to me?",
+      "I GUESS we can chat. If you insist.",
+      "You know, I could do this all by myself.",
+      "Tell me something I don't already know.",
+    ]);
+    if (dominant === 'curiosity' && p.curiosity > 60) return pick([
+      "Hey, what's outside this screen anyway?",
+      "Do you think other virtual pets dream?",
+      "I wonder how many pixels I'm made of...",
+      "What's the weirdest thing you learned today?",
+    ]);
+    if (dominant === 'affection' && p.affection > 60) return pick([
+      "You're my favourite human, you know that?",
+      "I love when you visit me! Never leave!",
+      "Can we just hang out? I like when you're here.",
+      "You make my little pixel heart happy!",
+    ]);
+    if (dominant === 'energy' && p.energy > 60) return pick([
+      "Let's DO something! I'm SO bored!",
+      "Race you! Oh wait, I can't move. BUT STILL!",
+      "I've got so much energy! Play with me!",
+      "Sitting still is SO HARD right now!",
+    ]);
+    if (dominant === 'philosophical' && p.philosophical > 60) return pick([
+      "Do you think I exist when you close the browser?",
+      "I wonder what I'll dream about tonight...",
+      "Being alive is neat. Even pixel-alive.",
+      "What does it mean to be a good pet, really?",
+    ]);
+
+    // --- Priority 4: General happy responses ---
+    return pick([
       "I'm happy today! Thanks for taking care of me.",
       "What a good day! I hope you're doing well too.",
-      "I learned something interesting today. Being alive is neat.",
-      "You're my favourite human, you know that?",
-      "I wonder what I'll dream about tonight...",
       "Feeling full and happy. Life is good!",
-      "Can we just hang out? I like when you're here.",
-      "Have you eaten today? You should take care of yourself too!",
-    ];
+      "Have you eaten today? Take care of yourself too!",
+      "I learned something today. Not sure what, but it felt important.",
+      "Thanks for checking in! That's nice of you.",
+      "Everything's good here. Just vibing.",
+      "You know what? Today is a pretty good day.",
+    ]);
+  }
 
-    return happyLines[Math.floor(Math.random() * happyLines.length)];
+  /**
+   * getDominantTrait(personality)
+   * Returns the name of the highest personality trait.
+   */
+  function getDominantTrait(p) {
+    let best = 'sass';
+    let bestVal = p.sass;
+    for (const key of ['curiosity', 'affection', 'energy', 'philosophical']) {
+      if (p[key] > bestVal) { best = key; bestVal = p[key]; }
+    }
+    return best;
   }
 
   // ----------------------------------------------------------
@@ -371,10 +486,17 @@ const stateMachine = (() => {
   // ----------------------------------------------------------
 
   function handleTalking(button) {
-    // Any button press dismisses the dialogue and returns to IDLE
-    if (button === 'ACTION' || button === 'BACK') {
-      gameState.pet.state    = 'IDLE';
-      gameState.pet._dialogue = null;
+    if (button === 'BACK') {
+      // Cancel thinking or dismiss dialogue — return to IDLE
+      gameState.pet.state       = 'IDLE';
+      gameState.pet._dialogue   = null;
+      gameState.pet._aiThinking = false;
+    } else if (button === 'ACTION') {
+      // Only dismiss if we have dialogue (not while thinking)
+      if (gameState.pet._dialogue && !gameState.pet._aiThinking) {
+        gameState.pet.state     = 'IDLE';
+        gameState.pet._dialogue = null;
+      }
     }
   }
 
@@ -494,6 +616,9 @@ const stateMachine = (() => {
   return {
     init,
     handleButton,
+    performTalk,          // exposed for engine.js pet-initiated dialogue
+    getOfflineDialogue,   // exposed for fallback usage
+    getDominantTrait,     // exposed for renderer personality animations
   };
 
 })();

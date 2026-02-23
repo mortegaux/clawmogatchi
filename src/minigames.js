@@ -111,7 +111,7 @@ const minigames = (() => {
     clampStats(gameState);
 
     gameState.pet.lastPlayed = gameState.time.currentTick;
-    gameState.careHistory.playCount++;
+    gameState.pet._playedThisTick = true; // rolling window care history
 
     const resultMsg = d.won ? 'Won' : 'Lost';
     addEventLog(gameState, `Minigame ${resultMsg}! (+${reward} happiness)`);

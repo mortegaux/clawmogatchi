@@ -591,13 +591,38 @@ const hal = (() => {
   // ----------------------------------------------------------
 
   /**
-   * hal.httpPost(url, body)
+   * hal.httpPost(url, body, headers, timeoutMs)
    * Sends a POST request and returns a Promise resolving to parsed JSON.
-   * Stub for Phase 1 — always rejects so callers use offline fallback.
+   * Uses AbortController for timeout support.
+   *
+   * @param {string} url        - The endpoint URL
+   * @param {object} body       - Request body (will be JSON.stringify'd)
+   * @param {object} headers    - Additional headers (merged with defaults)
+   * @param {number} timeoutMs  - Timeout in milliseconds (default 5000)
    */
-  async function httpPost(url, body) {
-    // TODO Phase 4: real fetch() call to Ollama or Claude API
-    return Promise.reject(new Error('Network not available in Phase 1'));
+  async function httpPost(url, body, headers = {}, timeoutMs = 5000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers,
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /**

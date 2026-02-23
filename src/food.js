@@ -290,8 +290,8 @@ function applyFoodEffects(state, foodId) {
     state.pet.candyCount6Tick++;
   }
 
-  // Update care history
-  state.careHistory.feedCount++;
+  // Flag for rolling window care history (engine recomputes counters each tick)
+  state.pet._fedThisTick = true;
 
   // Record when the pet was last fed
   state.pet.lastFed = state.time.currentTick;

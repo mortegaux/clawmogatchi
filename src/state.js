@@ -124,6 +124,22 @@ function createFreshState(generation = 1) {
       talkCount:    0,  // times talked in last 48 ticks
       cleanCount:   0,  // times cleaned in last 48 ticks
       neglectTicks: 0,  // ticks where any stat was below 20
+      // Rolling 48-tick window: each entry records actions for that tick
+      // { feed: bool, play: bool, talk: bool, clean: bool, neglect: bool }
+      _tickWindow:  [],
+    },
+
+    // ----------------------------------------------------------
+    // AI CONFIG — Phase 4 AI personality dialogue
+    // ----------------------------------------------------------
+    aiConfig: {
+      enabled:      false,                       // master toggle for AI dialogue
+      ollamaUrl:    'http://localhost:11434',     // Ollama server URL
+      ollamaModel:  'llama3.2',                  // Ollama model name
+      claudeApiKey: '',                           // Claude API key (fallback)
+      claudeModel:  'claude-haiku-4-5-20251001', // Claude model ID
+      preferOllama: true,                         // try Ollama first, then Claude
+      timeoutMs:    5000,                         // per-request timeout
     },
 
     // ----------------------------------------------------------
