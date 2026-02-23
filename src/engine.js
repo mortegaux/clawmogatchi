@@ -321,6 +321,7 @@ const engine = (() => {
 
     // Override visual state so renderer shows the rush animation
     if (pet.state === 'IDLE') pet.state = 'SUGAR_RUSH';
+    hal.playSfx('sugarRush');
 
     addEventLog(gameState, 'SUGAR RUSH! Too much candy!');
   }
@@ -336,6 +337,7 @@ const engine = (() => {
     clampStats(gameState);
 
     if (pet.state === 'SUGAR_RUSH') pet.state = 'SUGAR_CRASH';
+    hal.playSfx('sugarCrash');
 
     addEventLog(gameState, 'Sugar crash... feeling awful...');
   }
@@ -389,6 +391,7 @@ const engine = (() => {
       pet.poopCount++;
       gameState.stats.hygiene -= 15;
       clampStats(gameState);
+      hal.playSfx('poopBloop');
       addEventLog(gameState, `Poop! (${pet.poopCount} on screen)`);
     }
   }
@@ -448,6 +451,7 @@ const engine = (() => {
     if (becameSick) {
       pet.isSick   = true;
       pet.sickTicks = 0;
+      hal.playSfx('sickAlarm');
       addEventLog(gameState, `Pet got sick! (${cause})`);
     }
   }
@@ -469,6 +473,7 @@ const engine = (() => {
     if (pet.sickTicks >= 36) {
       pet.state        = 'DEAD';
       pet.causeOfDeath = buildCauseOfDeath();
+      hal.playSfx('deathTone');
       addEventLog(gameState, `Pet died after ${pet.age} ticks — ${pet.causeOfDeath}`);
       saveGame(); // save the death state so it persists on refresh
     }
@@ -579,7 +584,14 @@ const engine = (() => {
     const json = hal.loadState(SAVE_KEY);
     if (!json) return null;
     try {
-      return JSON.parse(json);
+      const loaded = JSON.parse(json);
+      // If saved mid-minigame, reset to IDLE (minigame state is transient)
+      if (loaded && loaded.pet && loaded.pet.state === 'PLAYING') {
+        loaded.pet.state = 'IDLE';
+        loaded.pet._currentMinigame = null;
+        loaded.pet._minigameData = null;
+      }
+      return loaded;
     } catch (e) {
       console.warn('[engine] Failed to parse saved state:', e);
       return null;

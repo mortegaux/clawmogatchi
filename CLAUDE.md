@@ -19,7 +19,7 @@ There are no tests, no linter config, and no package manager. This is intentiona
 Vanilla JS, no bundler, no modules. All files load as plain `<script>` tags. **Script load order in `index.html` is critical and must be preserved:**
 
 ```
-hal → state → food → sprites → engine → state-machine → renderer → input → main
+hal → state → food → sprites → minigames → engine → state-machine → renderer → input → main
 ```
 
 Each source file is an IIFE that returns a public API object assigned to a global variable (`hal`, `engine`, `stateMachine`, `renderer`, `input`). `gameState` is a single mutable object passed by reference to all modules — modules mutate it directly, they don't return new state.
@@ -28,12 +28,13 @@ Each source file is an IIFE that returns a public API object assigned to a globa
 
 | Module | Owns |
 |--------|------|
-| `hal.js` | Framebuffer, font, canvas I/O, button events, localStorage, audio/network stubs |
+| `hal.js` | Framebuffer, font, canvas I/O, button events, localStorage, Web Audio (playTone/playMelody/playSfx), network stubs |
 | `state.js` | `gameState` shape, `createFreshState()`, `addEventLog()`, `clampStats()`, `clampPersonality()` |
 | `food.js` | Food definitions, `applyFoodEffects()`, `getAvailableFoods()` |
 | `sprites.js` | All 1-bit pixel art arrays, `MENU_ICONS`, `FOOD_SPRITES` lookup, `ANIMATIONS`, `EATING_REACTIONS` |
 | `engine.js` | Tick loop, stat decay, sugar states, poop, sickness, death, personality drift, save/load |
-| `state-machine.js` | Button routing per state, action handlers (feed, clean, talk, sleep, medicine), offline dialogue |
+| `minigames.js` | Minigame framework + 3 games (guess, memory, dodge): startGame, handleInput, update, draw, endGame |
+| `state-machine.js` | Button routing per state, action handlers (feed, play, clean, talk, sleep, medicine), offline dialogue |
 | `renderer.js` | `requestAnimationFrame` loop, all canvas drawing — **never modifies gameState** (exception: eating animation completion in Phase 2) |
 | `input.js` | Keyboard + HTML button events → `hal._pressButton/_releaseButton` |
 | `main.js` | Entry point: init, load/catch-up, wire everything, dev panel |
@@ -66,7 +67,7 @@ Each phase (especially Phase 2+) contains more changes than can be written in a 
 
 - **Phase 1** ✅ Complete — playable core loop, placeholder sprites
 - **Phase 2** ✅ Complete — real pixel art, eating animation, screen transitions, dev tools (zoom/grid/preview)
-- **Phase 3** — Minigames + Web Audio API
+- **Phase 3** ✅ Complete — Minigames (Guess/Memory/Dodge) + Web Audio sound effects + mute toggle
 - **Phase 4** — AI personality via Ollama (local) or Claude API (fallback)
 - **Phase 5** — ESP32 C port (JS version is the spec)
 - **Phase 6** — Accelerometer, haptics, NeoPixel
@@ -74,6 +75,15 @@ Each phase (especially Phase 2+) contains more changes than can be written in a 
 ## Phase 2 Implementation Notes
 
 `HANDOFF.md` contains the full Phase 2 spec with exact code snippets. Key gotcha: `state-machine.js` is parsed before `renderer.js`, so `renderer.getFrameCount()` cannot be called from `state-machine.js`. The eating animation start frame is latched in the renderer on the first frame it detects `pet._eatingFood` (set to `null` initially, not a frame number).
+
+## Phase 3 Implementation Notes
+
+- **Audio**: `hal.js` creates a lazy `AudioContext` on first `playSfx()` call (inside a user gesture, satisfying browser autoplay policy). All sounds use oscillator-based synthesis — no audio files needed. `hal.playSfx(name)` plays named presets from the `SFX` table. Mute toggle via `hal.setMuted(bool)`.
+- **Minigames**: `minigames.js` IIFE loaded after `sprites.js`, before `engine.js`. Each game stores transient state in `gameState.pet._minigameData`. The `PLAYING` state is handled by `state-machine.js` (routes input) and `renderer.js` (calls `minigames.update/draw`). On load, if saved mid-minigame, engine resets state to IDLE.
+- **Guessing Game**: Best of 5 rounds, pet thinks LEFT/RIGHT, player guesses. 3+ correct = win (+20 happiness), else +8.
+- **Memory Match**: Show arrow sequence (3–6 based on pet age), player repeats. Perfect = +15–25 happiness.
+- **Dodge Game**: Side-scroller, ACTION to jump obstacles. Speed increases every 5 dodges. Survive 10 = +20 happiness.
+- **Dev tools**: Minigame dropdown selector and mute checkbox added to dev panel.
 
 ## Conventions
 

@@ -84,8 +84,8 @@ const renderer = (() => {
 
     // Detect state changes for screen transitions
     if (gameState.pet.state !== lastState) {
-      if (['STATS_VIEW','FEEDING','DEAD'].includes(gameState.pet.state) ||
-          ['STATS_VIEW','FEEDING','DEAD'].includes(lastState)) {
+      if (['STATS_VIEW','FEEDING','DEAD','PLAYING'].includes(gameState.pet.state) ||
+          ['STATS_VIEW','FEEDING','DEAD','PLAYING'].includes(lastState)) {
         activeTransition = { progress: 0, totalFrames: 20 };
       }
       lastState = gameState.pet.state;
@@ -253,7 +253,9 @@ const renderer = (() => {
     }
 
     // --- Draw special state overlays ---
-    if (state === 'FEEDING') {
+    if (state === 'PLAYING') {
+      drawMinigame();
+    } else if (state === 'FEEDING') {
       drawFoodCarousel();
     } else if (state === 'STATS_VIEW') {
       drawStatsScreen();
@@ -263,45 +265,48 @@ const renderer = (() => {
       drawDialogueBox(pet._dialogue);
     }
 
-    // --- Draw sick indicator (thermometer above pet) ---
-    if (pet.isSick && state !== 'DEAD') {
-      hal.drawSprite(PET_CENTER_X + 18, PET_AREA_Y + 10, SPRITES.thermometer);
-    }
-
-    // --- Draw poops ---
-    drawPoops(pet.poopCount);
-
-    // --- Draw sleep Zs ---
-    if (pet.isAsleep) {
-      drawSleepZs();
-    }
-
-    // --- Draw heart (appears briefly when petted) ---
-    if (pet._showHeart) {
-      const ticksSinceHeart = gameState.time.currentTick - (pet._showHeartTick || 0);
-      // Show heart for ~60 render frames (about 1 second)
-      if (frameCount % 120 < 60) {
-        hal.drawSprite(PET_CENTER_X + 12, PET_AREA_Y + 4, SPRITES.heart);
+    // --- Skip overlays during minigames (they draw their own full screen) ---
+    if (state !== 'PLAYING') {
+      // --- Draw sick indicator (thermometer above pet) ---
+      if (pet.isSick && state !== 'DEAD') {
+        hal.drawSprite(PET_CENTER_X + 18, PET_AREA_Y + 10, SPRITES.thermometer);
       }
-      // Clear heart flag after a while (based on real frame count, not ticks)
-      // We use a simple counter stored on the pet object
-      if (!pet._heartFrameStart) pet._heartFrameStart = frameCount;
-      if (frameCount - pet._heartFrameStart > 90) {
-        pet._showHeart       = false;
-        pet._heartFrameStart = 0;
+
+      // --- Draw poops ---
+      drawPoops(pet.poopCount);
+
+      // --- Draw sleep Zs ---
+      if (pet.isAsleep) {
+        drawSleepZs();
       }
-    }
 
-    // --- Draw sugar rush stars ---
-    if (state === 'SUGAR_RUSH') {
-      drawSugarRushEffect();
-    }
+      // --- Draw heart (appears briefly when petted) ---
+      if (pet._showHeart) {
+        const ticksSinceHeart = gameState.time.currentTick - (pet._showHeartTick || 0);
+        // Show heart for ~60 render frames (about 1 second)
+        if (frameCount % 120 < 60) {
+          hal.drawSprite(PET_CENTER_X + 12, PET_AREA_Y + 4, SPRITES.heart);
+        }
+        // Clear heart flag after a while (based on real frame count, not ticks)
+        // We use a simple counter stored on the pet object
+        if (!pet._heartFrameStart) pet._heartFrameStart = frameCount;
+        if (frameCount - pet._heartFrameStart > 90) {
+          pet._showHeart       = false;
+          pet._heartFrameStart = 0;
+        }
+      }
 
-    // --- Draw exclamation mark when social is very low ---
-    if (stats.social < 20 && state === 'IDLE') {
-      // Blink the exclamation mark
-      if (Math.floor(frameCount / 15) % 2 === 0) {
-        hal.drawSprite(PET_CENTER_X - 8, PET_AREA_Y + 4, SPRITES.exclamation);
+      // --- Draw sugar rush stars ---
+      if (state === 'SUGAR_RUSH') {
+        drawSugarRushEffect();
+      }
+
+      // --- Draw exclamation mark when social is very low ---
+      if (stats.social < 20 && state === 'IDLE') {
+        // Blink the exclamation mark
+        if (Math.floor(frameCount / 15) % 2 === 0) {
+          hal.drawSprite(PET_CENTER_X - 8, PET_AREA_Y + 4, SPRITES.exclamation);
+        }
       }
     }
 
@@ -334,6 +339,9 @@ const renderer = (() => {
     }
 
     switch (state) {
+      case 'PLAYING':
+        return null; // minigame draws its own content
+
       case 'DEAD':
         return SPRITES.petDead;
 
@@ -490,6 +498,30 @@ const renderer = (() => {
       pet._eatingFood       = null;
       pet._pendingFoodId    = null;
       pet._eatingStartFrame = 0;
+    }
+  }
+
+  // ----------------------------------------------------------
+  // MINIGAME (shown during PLAYING state)
+  // ----------------------------------------------------------
+
+  /**
+   * drawMinigame()
+   * Delegates update + draw to the minigames module.
+   * Also checks for completion and triggers endGame.
+   */
+  function drawMinigame() {
+    if (typeof minigames === 'undefined') return;
+
+    // Per-frame update (animations, timers, physics)
+    minigames.update(frameCount, gameState);
+
+    // Draw the minigame's display
+    minigames.draw(hal, gameState, frameCount);
+
+    // Check if the game completed during update (e.g. dodge collision)
+    if (minigames.isComplete(gameState)) {
+      minigames.endGame(gameState);
     }
   }
 

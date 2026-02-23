@@ -50,7 +50,20 @@
           </label>
 
           <label>
+            <input type="checkbox" id="mute-toggle"> Mute audio
+          </label>
+
+          <label>
             <input type="checkbox" id="grid-overlay"> Grid overlay
+          </label>
+
+          <label>Minigame:
+            <select id="minigame-select">
+              <option value="">-- play --</option>
+              <option value="guess">Guessing</option>
+              <option value="memory">Memory</option>
+              <option value="dodge">Dodge</option>
+            </select>
           </label>
 
           <label>Preview:
@@ -164,15 +177,16 @@
   </div>
 
   <!-- Load all game modules in dependency order -->
-  <script src="src/hal.js?v=2"></script>
-  <script src="src/state.js?v=2"></script>
-  <script src="src/food.js?v=2"></script>
-  <script src="src/sprites.js?v=2"></script>
-  <script src="src/engine.js?v=2"></script>
-  <script src="src/state-machine.js?v=2"></script>
-  <script src="src/renderer.js?v=2"></script>
-  <script src="src/input.js?v=2"></script>
-  <script src="src/main.js?v=2"></script>
+  <script src="src/hal.js?v=3"></script>
+  <script src="src/state.js?v=3"></script>
+  <script src="src/food.js?v=3"></script>
+  <script src="src/sprites.js?v=3"></script>
+  <script src="src/minigames.js?v=3"></script>
+  <script src="src/engine.js?v=3"></script>
+  <script src="src/state-machine.js?v=3"></script>
+  <script src="src/renderer.js?v=3"></script>
+  <script src="src/input.js?v=3"></script>
+  <script src="src/main.js?v=3"></script>
 
 </body>
 </html>

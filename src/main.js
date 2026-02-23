@@ -148,11 +148,31 @@ function initDevPanel() {
     });
   }
 
+  // Mute toggle
+  const muteCheck = document.getElementById('mute-toggle');
+  if (muteCheck) {
+    muteCheck.addEventListener('change', () => {
+      hal.setMuted(muteCheck.checked);
+    });
+  }
+
   // Grid overlay
   const gridCheck = document.getElementById('grid-overlay');
   if (gridCheck) {
     gridCheck.addEventListener('change', () => {
       renderer.setGridOverlay(gridCheck.checked);
+    });
+  }
+
+  // Minigame dev selector
+  const minigameSelect = document.getElementById('minigame-select');
+  if (minigameSelect) {
+    minigameSelect.addEventListener('change', () => {
+      const type = minigameSelect.value;
+      if (type && typeof minigames !== 'undefined') {
+        minigames.startGame(type, gameState);
+        minigameSelect.value = ''; // reset dropdown
+      }
     });
   }
 

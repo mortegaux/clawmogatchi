@@ -362,24 +362,199 @@ const hal = (() => {
   }
 
   // ----------------------------------------------------------
-  // AUDIO — stubs for Phase 1 (Phase 3 will implement Web Audio)
+  // AUDIO — Web Audio API (Phase 3)
   // ----------------------------------------------------------
 
+  let _audioCtx = null;
+  let _muted = false;
+
   /**
-   * hal.playTone(frequency, durationMs)
-   * Plays a single beep. No-op in Phase 1.
+   * _getAudioCtx()
+   * Lazily creates and returns the AudioContext.
+   * Must be called after a user gesture (browser autoplay policy).
    */
-  function playTone(frequency, durationMs) {
-    // TODO Phase 3: Web Audio API oscillator
-    // console.log(`[HAL] playTone(${frequency}Hz, ${durationMs}ms)`);
+  function _getAudioCtx() {
+    if (!_audioCtx) {
+      _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    // Resume if suspended (happens when created before user interaction)
+    if (_audioCtx.state === 'suspended') {
+      _audioCtx.resume();
+    }
+    return _audioCtx;
+  }
+
+  /**
+   * hal.playTone(frequency, durationMs, type, volume)
+   * Plays a single oscillator tone.
+   *   frequency  — Hz (e.g. 440)
+   *   durationMs — length in milliseconds
+   *   type       — 'square' | 'triangle' | 'sawtooth' | 'sine' (default 'square')
+   *   volume     — 0.0–1.0 (default 0.15)
+   */
+  function playTone(frequency, durationMs, type = 'square', volume = 0.15) {
+    if (_muted) return;
+    try {
+      const ctx = _getAudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = type;
+      osc.frequency.setValueAtTime(frequency, ctx.currentTime);
+
+      gain.gain.setValueAtTime(volume, ctx.currentTime);
+      // Quick fade-out to avoid clicks
+      const endTime = ctx.currentTime + durationMs / 1000;
+      gain.gain.setValueAtTime(volume, endTime - 0.01);
+      gain.gain.linearRampToValueAtTime(0, endTime);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(ctx.currentTime);
+      osc.stop(endTime);
+    } catch (e) {
+      // Silently fail — audio is non-essential
+    }
   }
 
   /**
    * hal.playMelody(noteArray)
-   * Plays a sequence of notes: [{freq, dur}, ...]. No-op in Phase 1.
+   * Plays a sequence of notes: [{freq, dur, type, vol}, ...]
+   * Each note plays after the previous one finishes.
+   * freq=0 or null means a rest (silence for that duration).
    */
   function playMelody(noteArray) {
-    // TODO Phase 3: Web Audio API
+    if (_muted || !noteArray || noteArray.length === 0) return;
+    try {
+      const ctx = _getAudioCtx();
+      let time = ctx.currentTime;
+
+      for (const note of noteArray) {
+        const freq = note.freq || 0;
+        const dur = (note.dur || 100) / 1000; // ms → seconds
+        const type = note.type || 'square';
+        const vol = note.vol !== undefined ? note.vol : 0.15;
+
+        if (freq > 0) {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, time);
+          gain.gain.setValueAtTime(vol, time);
+          gain.gain.setValueAtTime(vol, time + dur - 0.01);
+          gain.gain.linearRampToValueAtTime(0, time + dur);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(time);
+          osc.stop(time + dur);
+        }
+
+        time += dur;
+      }
+    } catch (e) {
+      // Silently fail
+    }
+  }
+
+  /**
+   * hal.setMuted(muted)
+   * Enables or disables all audio output.
+   */
+  function setMuted(muted) {
+    _muted = !!muted;
+  }
+
+  /**
+   * hal.isMuted()
+   * Returns the current mute state.
+   */
+  function isMuted() {
+    return _muted;
+  }
+
+  // ----------------------------------------------------------
+  // SOUND EFFECTS — named presets for game events
+  // ----------------------------------------------------------
+
+  const SFX = {
+    buttonClick:  () => playTone(800, 30, 'square', 0.08),
+    menuTick:     () => playTone(600, 40, 'square', 0.1),
+    menuSelect:   () => playTone(1000, 60, 'square', 0.12),
+    menuBack:     () => playTone(400, 50, 'square', 0.1),
+
+    feedChirp:    () => playMelody([
+      { freq: 523, dur: 60 }, { freq: 659, dur: 60 }, { freq: 784, dur: 80 }
+    ]),
+    cleanSweep:   () => playMelody([
+      { freq: 300, dur: 50 }, { freq: 400, dur: 50 }, { freq: 500, dur: 50 }, { freq: 600, dur: 80 }
+    ]),
+    poopBloop:    () => playMelody([
+      { freq: 200, dur: 80, type: 'sine' }, { freq: 150, dur: 120, type: 'sine' }
+    ]),
+    sickAlarm:    () => playMelody([
+      { freq: 440, dur: 150 }, { freq: 0, dur: 100 }, { freq: 440, dur: 150 }, { freq: 0, dur: 100 }, { freq: 440, dur: 150 }
+    ]),
+    deathTone:    () => playMelody([
+      { freq: 440, dur: 200, type: 'triangle' },
+      { freq: 370, dur: 200, type: 'triangle' },
+      { freq: 311, dur: 200, type: 'triangle' },
+      { freq: 262, dur: 400, type: 'triangle', vol: 0.2 }
+    ]),
+    medicineChime: () => playMelody([
+      { freq: 523, dur: 80 }, { freq: 659, dur: 80 }, { freq: 784, dur: 80 }, { freq: 1047, dur: 120 }
+    ]),
+    petHeart:     () => playMelody([
+      { freq: 880, dur: 60, type: 'sine', vol: 0.1 }, { freq: 1047, dur: 80, type: 'sine', vol: 0.1 }
+    ]),
+    sleepToggle:  () => playMelody([
+      { freq: 392, dur: 100, type: 'sine', vol: 0.1 }, { freq: 330, dur: 150, type: 'sine', vol: 0.08 }
+    ]),
+    talkStart:    () => playMelody([
+      { freq: 523, dur: 50 }, { freq: 587, dur: 50 }, { freq: 659, dur: 70 }
+    ]),
+    sugarRush:    () => playMelody([
+      { freq: 784, dur: 50 }, { freq: 988, dur: 50 }, { freq: 1175, dur: 50 },
+      { freq: 1319, dur: 50 }, { freq: 1568, dur: 80 }
+    ]),
+    sugarCrash:   () => playMelody([
+      { freq: 330, dur: 100, type: 'triangle' }, { freq: 262, dur: 100, type: 'triangle' },
+      { freq: 196, dur: 200, type: 'triangle', vol: 0.1 }
+    ]),
+    newPet:       () => playMelody([
+      { freq: 523, dur: 80 }, { freq: 659, dur: 80 }, { freq: 784, dur: 80 },
+      { freq: 1047, dur: 120 }, { freq: 0, dur: 50 }, { freq: 1047, dur: 150 }
+    ]),
+
+    // Minigame sounds (Phase 3.2+)
+    gameCorrect:  () => playMelody([
+      { freq: 880, dur: 60 }, { freq: 1047, dur: 80 }
+    ]),
+    gameWrong:    () => playMelody([
+      { freq: 311, dur: 80, type: 'sawtooth', vol: 0.1 }, { freq: 233, dur: 120, type: 'sawtooth', vol: 0.1 }
+    ]),
+    gameWin:      () => playMelody([
+      { freq: 523, dur: 60 }, { freq: 659, dur: 60 }, { freq: 784, dur: 60 },
+      { freq: 1047, dur: 100 }, { freq: 0, dur: 40 }, { freq: 1047, dur: 150 }
+    ]),
+    gameLose:     () => playMelody([
+      { freq: 392, dur: 100, type: 'triangle' }, { freq: 330, dur: 100, type: 'triangle' },
+      { freq: 262, dur: 200, type: 'triangle' }
+    ]),
+    gameStart:    () => playMelody([
+      { freq: 523, dur: 50 }, { freq: 784, dur: 80 }
+    ]),
+    gameJump:     () => playTone(600, 50, 'square', 0.1),
+  };
+
+  /**
+   * hal.playSfx(name)
+   * Plays a named sound effect from the SFX table.
+   */
+  function playSfx(name) {
+    if (SFX[name]) SFX[name]();
   }
 
   // ----------------------------------------------------------
@@ -495,6 +670,9 @@ const hal = (() => {
     // Audio
     playTone,
     playMelody,
+    playSfx,
+    setMuted,
+    isMuted,
 
     // Storage
     saveState,

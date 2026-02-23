@@ -779,15 +779,19 @@ No background music in v1. The silence between sounds is part of the Tamagotchi 
 - **Goal:** Visually complete Tamagotchi experience. Every food has a unique sprite and eating animation. The pet looks alive and expressive.
 - **Delivered:** 2026-02-22. All items complete. Eating animation defers food effects to renderer (the one intentional exception to "renderer never modifies state"). Dialogue scroll-in effect added. Talking state cycles mouth frames.
 
-### Phase 3: Minigames & Sound
-- [ ] Implement Memory Match minigame
-- [ ] Implement Dodge minigame
-- [ ] Implement Guessing Game minigame
-- [ ] Random minigame selection from PLAY menu
-- [ ] Sound effect system (Web Audio API for emulator)
-- [ ] All sound effects from §7.1
-- [ ] Minigame sound feedback (correct/wrong/win/lose)
+### Phase 3: Minigames & Sound ✅ COMPLETE
+- [x] Implement Memory Match minigame
+- [x] Implement Dodge minigame
+- [x] Implement Guessing Game minigame
+- [x] Random minigame selection from PLAY menu
+- [x] Sound effect system (Web Audio API for emulator)
+- [x] All sound effects from §8.1 (oscillator-based synthesis, no audio files)
+- [x] Minigame sound feedback (correct/wrong/win/lose)
+- [x] Mute toggle in dev panel
+- [x] Dev tool: minigame selector dropdown to force-start specific game
+- [x] Save/load safety (mid-minigame state resets to IDLE on load)
 - **Goal:** Feature-complete Tamagotchi with games and audio. Still no AI.
+- **Delivered:** 2026-02-22. All items complete. New file `src/minigames.js` added (IIFE, loads after sprites.js). Audio uses lazy AudioContext init inside user gesture handlers to satisfy browser autoplay policy. Three minigames: Guessing Game (best of 5 LEFT/RIGHT), Memory Match (sequence repeat, difficulty scales with age), Dodge (side-scroller, ACTION to jump). PLAYING state added to state machine and renderer.
 
 ### Phase 4: AI Personality Integration
 - [ ] Implement personality trait system with evolution

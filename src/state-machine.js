@@ -71,6 +71,7 @@ const stateMachine = (() => {
       case 'SLEEPING':    handleSleeping(button);     break;
       case 'SICK':        handleSick(button);         break;
       case 'DEAD':        handleDead(button);          break;
+      case 'PLAYING':     handlePlaying(button);       break;
       case 'STATS_VIEW':  handleStatsView(button);    break;
       case 'SUGAR_RUSH':  handleSugarRush(button);    break;
       case 'SUGAR_CRASH': handleSugarCrash(button);   break;
@@ -87,6 +88,7 @@ const stateMachine = (() => {
   function handleIdle(button) {
     if (button === 'LEFT' || button === 'RIGHT') {
       // Open the menu
+      hal.playSfx('menuTick');
       enterMenu();
 
     } else if (button === 'ACTION') {
@@ -96,6 +98,7 @@ const stateMachine = (() => {
       clampStats(gameState);
 
       addEventLog(gameState, 'Petted Claw (+3 happiness)');
+      hal.playSfx('petHeart');
 
       // Signal the renderer to show a heart animation (it reads this flag)
       gameState.pet._showHeart    = true;
@@ -114,20 +117,24 @@ const stateMachine = (() => {
     if (button === 'LEFT') {
       // Cycle left through icons (wrapping)
       gameState.pet.menuIndex = (gameState.pet.menuIndex - 1 + iconCount) % iconCount;
+      hal.playSfx('menuTick');
       resetMenuTimeout();
 
     } else if (button === 'RIGHT') {
       // Cycle right through icons (wrapping)
       gameState.pet.menuIndex = (gameState.pet.menuIndex + 1) % iconCount;
+      hal.playSfx('menuTick');
       resetMenuTimeout();
 
     } else if (button === 'ACTION') {
       // Select the current icon
+      hal.playSfx('menuSelect');
       clearMenuTimeout();
       dispatchMenuAction(MENU_ICONS[gameState.pet.menuIndex].id);
 
     } else if (button === 'BACK') {
       // Exit menu, return to idle
+      hal.playSfx('menuBack');
       clearMenuTimeout();
       exitMenu();
     }
@@ -173,14 +180,12 @@ const stateMachine = (() => {
         break;
 
       case 'play':
-        // Phase 3 — for now just give a small happiness boost as a placeholder
-        gameState.stats.happiness = Math.min(100, gameState.stats.happiness + 10);
-        gameState.stats.social    = Math.min(100, gameState.stats.social + 5);
-        gameState.pet.lastPlayed  = gameState.time.currentTick;
-        gameState.careHistory.playCount++;
-        clampStats(gameState);
-        addEventLog(gameState, 'Played! (minigames coming Phase 3)');
-        exitMenu();
+        // Pick a random minigame and start it
+        {
+          const types = minigames.GAME_TYPES;
+          const pick = types[Math.floor(Math.random() * types.length)];
+          minigames.startGame(pick, gameState);
+        }
         break;
 
       case 'clean':
@@ -198,6 +203,7 @@ const stateMachine = (() => {
       case 'medicine':
         if (gameState.pet.isSick) {
           engine.applyMedicine();
+          hal.playSfx('medicineChime');
           exitMenu();
         } else {
           addEventLog(gameState, 'No medicine needed right now');
@@ -252,10 +258,12 @@ const stateMachine = (() => {
       gameState.pet._eatingStartFrame = null;  // renderer latches on first frame
       gameState.pet._eatingReact      = EATING_REACTIONS[food.id] || EATING_REACTIONS.default;
       gameState.pet._pendingFoodId    = food.id;
+      hal.playSfx('feedChirp');
       // Stay in FEEDING state; renderer will transition to IDLE when done
 
     } else if (button === 'BACK') {
       // Cancel — go back to menu
+      hal.playSfx('menuBack');
       enterMenu();
     }
   }
@@ -272,6 +280,7 @@ const stateMachine = (() => {
     clampStats(gameState);
 
     addEventLog(gameState, `Cleaned! Hygiene +30`);
+    hal.playSfx('cleanSweep');
 
     // Reset the hygiene-low-ticks counter since we just cleaned
     gameState.pet.hygieneLoTicks = 0;
@@ -297,6 +306,7 @@ const stateMachine = (() => {
     const response = getOfflineDialogue(gameState);
     gameState.pet._dialogue      = response;
     gameState.pet._dialogueTick  = gameState.time.currentTick;
+    hal.playSfx('talkStart');
 
     addEventLog(gameState, `Talked: "${response.substring(0, 30)}..."`);
   }
@@ -386,6 +396,7 @@ const stateMachine = (() => {
       gameState.pet.state    = 'SLEEPING';
       addEventLog(gameState, 'Pet went to sleep');
     }
+    hal.playSfx('sleepToggle');
   }
 
   // ----------------------------------------------------------
@@ -426,7 +437,22 @@ const stateMachine = (() => {
       Object.assign(gameState, newState);
 
       addEventLog(gameState, `Generation ${newGen} begins!`);
+      hal.playSfx('newPet');
       engine.saveGame();
+    }
+  }
+
+  // ----------------------------------------------------------
+  // STATE: PLAYING (minigame active)
+  // ----------------------------------------------------------
+
+  function handlePlaying(button) {
+    // Route all input to the active minigame
+    minigames.handleInput(button, gameState);
+
+    // If the minigame just completed, apply rewards and exit
+    if (minigames.isComplete(gameState)) {
+      minigames.endGame(gameState);
     }
   }
 
